@@ -7,12 +7,18 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/dzuura/neurodyx-be/config"
 )
 
 func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Inisialisasi Firebase
+	if err := config.InitFirebase(); err != nil {
+		log.Fatalf("Failed to initialize Firebase: %v", err)
 	}
 
 	// Setup router
