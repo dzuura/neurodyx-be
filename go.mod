@@ -4,7 +4,12 @@ go 1.24.2
 
 require github.com/gorilla/mux v1.8.1
 
-require github.com/joho/godotenv v1.5.1
+require (
+	firebase.google.com/go v3.13.0+incompatible
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/joho/godotenv v1.5.1
+	google.golang.org/api v0.230.0
+)
 
 require (
 	cel.dev/expr v0.20.0 // indirect
@@ -17,7 +22,6 @@ require (
 	cloud.google.com/go/longrunning v0.6.6 // indirect
 	cloud.google.com/go/monitoring v1.24.0 // indirect
 	cloud.google.com/go/storage v1.52.0 // indirect
-	firebase.google.com/go v3.13.0+incompatible // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
@@ -53,7 +57,6 @@ require (
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
-	google.golang.org/api v0.230.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
