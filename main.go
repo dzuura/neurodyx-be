@@ -9,6 +9,7 @@ import (
     "github.com/joho/godotenv"
     "github.com/dzuura/neurodyx-be/config"
     "github.com/dzuura/neurodyx-be/handlers"
+    "github.com/dzuura/neurodyx-be/middleware"
 )
 
 func main() {
@@ -33,11 +34,18 @@ func main() {
     r.HandleFunc("/api/auth/register", handlers.RegisterHandler).Methods("POST")
     r.HandleFunc("/api/auth/google", handlers.GoogleLoginHandler).Methods("POST")
 
+    // Protected routes
+    r.HandleFunc("/api/screening/questions", middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler)).Methods("POST")
+    r.HandleFunc("/api/screening/questions", middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler)).Methods("GET")
+    r.HandleFunc("/api/screening/submit", middleware.AuthMiddleware(handlers.SubmitScreeningHandler)).Methods("POST")
+
     // Start server
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
     }
     log.Printf("Server starting on :%s", port)
-    log.Fatal(http.ListenAndServe(":"+port, r))
+    if err := http.ListenAndServe(":"+port, r); err != nil {
+        log.Fatalf("Server failed to start: %v", err)
+    }
 }
