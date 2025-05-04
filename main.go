@@ -34,10 +34,18 @@ func main() {
     r.HandleFunc("/api/auth/register", handlers.RegisterHandler).Methods("POST")
     r.HandleFunc("/api/auth/google", handlers.GoogleLoginHandler).Methods("POST")
 
-    // Protected routes
-    r.HandleFunc("/api/screening/questions", middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler)).Methods("POST")
-    r.HandleFunc("/api/screening/questions", middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler)).Methods("GET")
-    r.HandleFunc("/api/screening/submit", middleware.AuthMiddleware(handlers.SubmitScreeningHandler)).Methods("POST")
+    // Protected routes for screening
+    screeningRouter := r.PathPrefix("/api/screening").Subrouter()
+    screeningRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler)).Methods("POST")
+    screeningRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler)).Methods("GET")
+    screeningRouter.HandleFunc("/submit", middleware.AuthMiddleware(handlers.SubmitScreeningHandler)).Methods("POST")
+
+    // Protected routes for assessment
+    assessmentRouter := r.PathPrefix("/api/assessment").Subrouter()
+    assessmentRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.AddAssessmentQuestionHandler)).Methods("POST")
+    assessmentRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.GetAssessmentQuestionsHandler)).Methods("GET")
+    assessmentRouter.HandleFunc("/submit", middleware.AuthMiddleware(handlers.SubmitAnswerHandler)).Methods("POST")
+    assessmentRouter.HandleFunc("/results", middleware.AuthMiddleware(handlers.GetAssessmentResultsHandler)).Methods("GET")
 
     // Start server
     port := os.Getenv("PORT")

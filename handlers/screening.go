@@ -10,11 +10,6 @@ import (
     "github.com/dzuura/neurodyx-be/services"
 )
 
-// ErrorResponse represents a standard error response structure
-type ErrorResponse struct {
-    Error string `json:"error"`
-}
-
 // AddScreeningQuestionHandler handles the creation of a new screening question
 func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
@@ -23,19 +18,19 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     var question models.ScreeningQuestion
     if err := json.NewDecoder(r.Body).Decode(&question); err != nil {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body: " + err.Error()})
         return
     }
 
     // Validate required fields
     if question.AgeGroup == "" {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing required field: ageGroup"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: ageGroup"})
         return
     }
     if question.Question == "" {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing required field: question"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: question"})
         return
     }
 
@@ -43,7 +38,7 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     firebaseToken, ok := r.Context().Value("firebaseToken").(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
         return
     }
 
@@ -52,14 +47,14 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Printf("Error saving screening question: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to save screening question: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to save screening question: " + err.Error()})
         return
     }
 
     w.WriteHeader(http.StatusCreated)
     json.NewEncoder(w).Encode(map[string]string{"questionID": questionID})
 }
-
+    
 // GetScreeningQuestionsHandler retrieves screening questions, optionally filtered by ageGroup
 func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
@@ -71,7 +66,7 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     firebaseToken, ok := r.Context().Value("firebaseToken").(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
         return
     }
 
@@ -80,7 +75,7 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Printf("Error retrieving screening questions: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to retrieve screening questions: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve screening questions: " + err.Error()})
         return
     }
 
@@ -96,19 +91,19 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     var submission models.ScreeningSubmission
     if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body: " + err.Error()})
         return
     }
 
     // Validate required fields
     if submission.AgeGroup == "" {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing required field: ageGroup"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: ageGroup"})
         return
     }
     if len(submission.Answers) == 0 {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Answers cannot be empty"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Answers cannot be empty"})
         return
     }
 
@@ -116,13 +111,13 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     firebaseToken, ok := r.Context().Value("firebaseToken").(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
         return
     }
     userID, ok := r.Context().Value("userID").(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "User ID missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
@@ -131,7 +126,7 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Printf("Error retrieving screening questions: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to retrieve screening questions: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve screening questions: " + err.Error()})
         return
     }
 
@@ -139,12 +134,12 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     expectedAnswerCount := len(questions)
     if expectedAnswerCount == 0 {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "No screening questions found for ageGroup: " + submission.AgeGroup})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "No screening questions found for ageGroup: " + submission.AgeGroup})
         return
     }
     if len(submission.Answers) != expectedAnswerCount {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid number of answers: expected " + strconv.Itoa(expectedAnswerCount) + ", got " + strconv.Itoa(len(submission.Answers))})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid number of answers: expected " + strconv.Itoa(expectedAnswerCount) + ", got " + strconv.Itoa(len(submission.Answers))})
         return
     }
 
@@ -174,7 +169,7 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Printf("Error saving screening result: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to save screening result: " + err.Error()})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to save screening result: " + err.Error()})
         return
     }
 
