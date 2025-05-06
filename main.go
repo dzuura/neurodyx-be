@@ -30,9 +30,8 @@ func main() {
     r.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
         w.Write([]byte("Neurodyx Backend is running"))
     }).Methods("GET")
-    r.HandleFunc("/api/auth/login", handlers.LoginHandler).Methods("POST")
-    r.HandleFunc("/api/auth/register", handlers.RegisterHandler).Methods("POST")
-    r.HandleFunc("/api/auth/google", handlers.GoogleLoginHandler).Methods("POST")
+    r.HandleFunc("/api/auth", handlers.AuthHandler).Methods("POST")
+    r.HandleFunc("/api/refresh", handlers.RefreshHandler).Methods("POST")
 
     // Protected routes for screening
     screeningRouter := r.PathPrefix("/api/screening").Subrouter()

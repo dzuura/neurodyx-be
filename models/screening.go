@@ -7,5 +7,5 @@ type ScreeningQuestion struct {
 
 type ScreeningSubmission struct {
     AgeGroup string `json:"ageGroup"`
-    Answers  []bool `json:"answers"`
+    Answers  []bool `json:"answers,omitempty"`
 }

@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/dzuura/neurodyx-be/config"
+	"github.com/dzuura/neurodyx-be/middleware"
 	"github.com/dzuura/neurodyx-be/models"
 	"github.com/dzuura/neurodyx-be/services"
 )
 
-// AddAssessmentQuestionHandler handles the creation of a new assessment question
+// AddAssessmentQuestionHandler creates a new assessment question
 func AddAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
     defer func() {
         if r := recover(); r != nil {
@@ -42,14 +43,14 @@ func AddAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
-    questionID, err := services.SaveAssessmentQuestion(r.Context(), question, firebaseToken)
+    questionID, err := services.SaveAssessmentQuestion(r.Context(), question, userID)
     if err != nil {
         log.Printf("Error saving assessment question: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
@@ -61,7 +62,7 @@ func AddAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"questionID": questionID})
 }
 
-// GetAssessmentQuestionsHandler retrieves assessment questions by type
+// GetAssessmentQuestionsHandler retrieves assessment questions based on type
 func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     defer func() {
         if r := recover(); r != nil {
@@ -73,10 +74,10 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
 
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
@@ -90,7 +91,11 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 
     questions := []models.AssessmentQuestion{}
     for _, t := range typeFilters {
-        qs, err := services.GetAssessmentQuestions(r.Context(), t, firebaseToken)
+        if cached, ok := config.LoadFromCache(&config.AssessmentQuestionCache, t); ok {
+            questions = append(questions, cached.([]models.AssessmentQuestion)...)
+            continue
+        }
+        qs, err := services.GetAssessmentQuestions(r.Context(), t, userID)
         if err != nil {
             log.Printf("Error retrieving assessment questions for type %s: %v", t, err)
             w.WriteHeader(http.StatusInternalServerError)
@@ -98,50 +103,14 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
             return
         }
         questions = append(questions, qs...)
+        config.StoreInCache(&config.AssessmentQuestionCache, t, qs)
     }
 
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
 }
 
-// GetAssessmentResultsHandler retrieves the user's assessment results
-func GetAssessmentResultsHandler(w http.ResponseWriter, r *http.Request) {
-    defer func() {
-        if r := recover(); r != nil {
-            log.Printf("Recovered from panic in GetAssessmentResultsHandler: %v", r)
-            w.WriteHeader(http.StatusInternalServerError)
-            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
-        }
-    }()
-
-    w.Header().Set("Content-Type", "application/json")
-
-    userID, ok := r.Context().Value("userID").(string)
-    if !ok {
-        w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
-        return
-    }
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
-    if !ok {
-        w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
-        return
-    }
-
-    results, err := services.GetAssessmentResults(r.Context(), userID, firebaseToken)
-    if err != nil {
-        log.Printf("Error retrieving assessment results: %v", err)
-        w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve results: " + err.Error()})
-        return
-    }
-
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(results)
-}
-
-// SubmitAnswerHandler handles answer submissions for different question types
+// SubmitAnswerHandler processes and saves assessment answer submissions
 func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
     defer func() {
         if r := recover(); r != nil {
@@ -162,34 +131,19 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if len(submission.Submissions) == 0 {
-        log.Printf("Received empty submissions")
+    if len(submission.Submissions) == 0 || len(submission.Submissions) > 100 {
+        log.Printf("Received empty or excessive submissions: %d", len(submission.Submissions))
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Submissions cannot be empty"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Submissions cannot be empty or exceed 100"})
         return
     }
 
-    userID, ok := r.Context().Value("userID").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
         json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
-    if !ok {
-        w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
-        return
-    }
-
-    firestoreClient, err := config.App.Firestore(r.Context())
-    if err != nil {
-        log.Printf("Failed to connect to Firestore: %v", err)
-        w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
-        return
-    }
-    defer firestoreClient.Close()
 
     totalCorrect := 0
     typeMap := make(map[string]int)
@@ -200,24 +154,13 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
             continue
         }
 
-        result, err := services.SaveAssessmentResult(r.Context(), userID, sub, firebaseToken)
+        result, err := services.SaveAssessmentResult(r.Context(), userID, sub, "")
         if err != nil {
             log.Printf("Error submitting answer for question %s: %v", sub.QuestionID, err)
             continue
         }
         totalCorrect += result.CorrectAnswers
         typeMap[question.Type] = typeMap[question.Type] + result.CorrectAnswers
-    }
-
-    totalQuestionsByType := make(map[string]int)
-    for _, sub := range submission.Submissions {
-        question, err := services.GetQuestionByID(r.Context(), sub.QuestionID)
-        if err == nil {
-            docs, err := firestoreClient.Collection("assessmentQuestions").Where("type", "==", question.Type).Documents(r.Context()).GetAll()
-            if err == nil {
-                totalQuestionsByType[question.Type] = len(docs)
-            }
-        }
     }
 
     resultType := ""
@@ -231,13 +174,44 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
     result := models.AssessmentResult{
         Type:           resultType,
         CorrectAnswers: totalCorrect,
-        TotalQuestions: totalQuestionsByType[resultType],
+        TotalQuestions: len(submission.Submissions),
         Status:         "completed",
     }
 
-    log.Printf("Successfully processed %d submissions for userID: %s, type: %s, correct: %d/%d", len(submission.Submissions), userID, resultType, totalCorrect, totalQuestionsByType[resultType])
+    log.Printf("Successfully processed %d submissions for userID: %s, type: %s, correct: %d", len(submission.Submissions), userID, resultType, totalCorrect)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]interface{}{
         "result": result,
     })
+}
+
+// GetAssessmentResultsHandler retrieves a user's assessment results
+func GetAssessmentResultsHandler(w http.ResponseWriter, r *http.Request) {
+    defer func() {
+        if r := recover(); r != nil {
+            log.Printf("Recovered from panic in GetAssessmentResultsHandler: %v", r)
+            w.WriteHeader(http.StatusInternalServerError)
+            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
+        }
+    }()
+
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    results, err := services.GetAssessmentResults(r.Context(), userID, "")
+    if err != nil {
+        log.Printf("Error retrieving assessment results: %v", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve results: " + err.Error()})
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(results)
 }

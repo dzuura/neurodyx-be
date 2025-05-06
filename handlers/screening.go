@@ -1,20 +1,21 @@
 package handlers
 
 import (
-    "encoding/json"
-    "log"
-    "net/http"
-    "strconv"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strconv"
 
-    "github.com/dzuura/neurodyx-be/models"
-    "github.com/dzuura/neurodyx-be/services"
+	"github.com/dzuura/neurodyx-be/config"
+	"github.com/dzuura/neurodyx-be/middleware"
+	"github.com/dzuura/neurodyx-be/models"
+	"github.com/dzuura/neurodyx-be/services"
 )
 
-// AddScreeningQuestionHandler handles the creation of a new screening question
+// AddScreeningQuestionHandler creates a new screening question
 func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 
-    // Decode request body
     var question models.ScreeningQuestion
     if err := json.NewDecoder(r.Body).Decode(&question); err != nil {
         w.WriteHeader(http.StatusBadRequest)
@@ -22,28 +23,20 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Validate required fields
-    if question.AgeGroup == "" {
+    if question.AgeGroup == "" || question.Question == "" {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: ageGroup"})
-        return
-    }
-    if question.Question == "" {
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: question"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required fields: ageGroup or question"})
         return
     }
 
-    // Extract firebaseToken from context
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
-    // Save the question
-    questionID, err := services.SaveScreeningQuestion(r.Context(), question, firebaseToken)
+    questionID, err := services.SaveScreeningQuestion(r.Context(), question, userID)
     if err != nil {
         log.Printf("Error saving screening question: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
@@ -54,24 +47,27 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusCreated)
     json.NewEncoder(w).Encode(map[string]string{"questionID": questionID})
 }
-    
-// GetScreeningQuestionsHandler retrieves screening questions, optionally filtered by ageGroup
+
+// GetScreeningQuestionsHandler retrieves screening questions based on age group
 func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 
-    // Extract ageGroup from query parameters
     ageGroup := r.URL.Query().Get("ageGroup")
 
-    // Extract firebaseToken from context
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
-    // Retrieve questions
-    questions, err := services.GetScreeningQuestions(r.Context(), ageGroup, firebaseToken)
+    if cached, ok := config.LoadFromCache(&config.ScreeningQuestionCache, ageGroup); ok {
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode(cached)
+        return
+    }
+
+    questions, err := services.GetScreeningQuestions(r.Context(), ageGroup, userID)
     if err != nil {
         log.Printf("Error retrieving screening questions: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
@@ -79,15 +75,15 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    config.StoreInCache(&config.ScreeningQuestionCache, ageGroup, questions)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
 }
 
-// SubmitScreeningHandler handles the submission of screening answers and calculates the risk level
+// SubmitScreeningHandler processes and saves screening submissions
 func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 
-    // Decode request body
     var submission models.ScreeningSubmission
     if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
         w.WriteHeader(http.StatusBadRequest)
@@ -95,34 +91,20 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Validate required fields
-    if submission.AgeGroup == "" {
+    if submission.AgeGroup == "" || len(submission.Answers) == 0 || len(submission.Answers) > 50 {
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: ageGroup"})
-        return
-    }
-    if len(submission.Answers) == 0 {
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Answers cannot be empty"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: ageGroup, or answers empty/exceed 50"})
         return
     }
 
-    // Extract firebaseToken and userID from context
-    firebaseToken, ok := r.Context().Value("firebaseToken").(string)
-    if !ok {
-        w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Authentication token missing"})
-        return
-    }
-    userID, ok := r.Context().Value("userID").(string)
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
         json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
         return
     }
 
-    // Fetch the number of screening questions for the given ageGroup
-    questions, err := services.GetScreeningQuestions(r.Context(), submission.AgeGroup, firebaseToken)
+    questions, err := services.GetScreeningQuestions(r.Context(), submission.AgeGroup, userID)
     if err != nil {
         log.Printf("Error retrieving screening questions: %v", err)
         w.WriteHeader(http.StatusInternalServerError)
@@ -130,7 +112,6 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Validate the number of answers matches the number of questions
     expectedAnswerCount := len(questions)
     if expectedAnswerCount == 0 {
         w.WriteHeader(http.StatusBadRequest)
@@ -143,7 +124,6 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Calculate score based on answers
     score := 0
     for _, answer := range submission.Answers {
         if answer {
@@ -151,12 +131,11 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    // Determine risk level based on percentage of "true" answers
     totalQuestions := float64(expectedAnswerCount)
     truePercentage := float64(score) / totalQuestions * 100
     var riskLevel string
     switch {
-    case truePercentage < 40:
+    case truePercentage <= 40:
         riskLevel = "low"
     case truePercentage <= 70:
         riskLevel = "moderate"
@@ -164,8 +143,7 @@ func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
         riskLevel = "high"
     }
 
-    // Save the submission
-    err = services.SaveScreeningResult(r.Context(), userID, submission.AgeGroup, submission.Answers, riskLevel, firebaseToken)
+    err = services.SaveScreeningResult(r.Context(), userID, submission.AgeGroup, submission.Answers, riskLevel, "")
     if err != nil {
         log.Printf("Error saving screening result: %v", err)
         w.WriteHeader(http.StatusInternalServerError)

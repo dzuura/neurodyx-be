@@ -1,29 +1,19 @@
 package services
 
 import (
-	"context"
-	"fmt"
-	"log"
+    "context"
+    "fmt"
+    "log"
 
-	"cloud.google.com/go/firestore"
-	"github.com/dzuura/neurodyx-be/config"
-	"github.com/dzuura/neurodyx-be/models"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+    "cloud.google.com/go/firestore"
+    "github.com/dzuura/neurodyx-be/config"
+    "github.com/dzuura/neurodyx-be/models"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 // SaveScreeningQuestion saves a new screening question to Firestore
-func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestion, firebaseToken string) (string, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return "", fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return "", fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
+func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestion, userID string) (string, error) {
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return "", fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -44,17 +34,7 @@ func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestio
 }
 
 // GetScreeningQuestions retrieves screening questions, optionally filtered by ageGroup
-func GetScreeningQuestions(ctx context.Context, ageGroup string, firebaseToken string) ([]models.ScreeningQuestion, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return nil, fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
+func GetScreeningQuestions(ctx context.Context, ageGroup string, userID string) ([]models.ScreeningQuestion, error) {
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -86,16 +66,6 @@ func GetScreeningQuestions(ctx context.Context, ageGroup string, firebaseToken s
 
 // SaveScreeningResult saves the user's screening submission and risk level
 func SaveScreeningResult(ctx context.Context, userID, ageGroup string, answers []bool, riskLevel string, firebaseToken string) error {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -189,17 +159,7 @@ func GetQuestionByID(ctx context.Context, questionID string) (models.AssessmentQ
 }
 
 // SaveAssessmentQuestion saves a new assessment question to Firestore
-func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuestion, firebaseToken string) (string, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return "", fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return "", fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
+func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuestion, userID string) (string, error) {
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return "", fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -230,17 +190,7 @@ func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuest
 }
 
 // GetAssessmentQuestions retrieves assessment questions by type
-func GetAssessmentQuestions(ctx context.Context, questionType string, firebaseToken string) ([]models.AssessmentQuestion, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return nil, fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
+func GetAssessmentQuestions(ctx context.Context, questionType string, userID string) ([]models.AssessmentQuestion, error) {
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -334,15 +284,6 @@ func GetAssessmentQuestions(ctx context.Context, questionType string, firebaseTo
 
 // SaveAssessmentResult saves the user's assessment result with flexible answer validation
 func SaveAssessmentResult(ctx context.Context, userID string, submission models.AssessmentSubmission, firebaseToken string) (models.AssessmentResult, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return models.AssessmentResult{}, fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return models.AssessmentResult{}, fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return models.AssessmentResult{}, fmt.Errorf("failed to connect to Firestore: %w", err)
@@ -439,23 +380,12 @@ func SaveAssessmentResult(ctx context.Context, userID string, submission models.
 
 // GetAssessmentResults retrieves all assessment results for a user
 func GetAssessmentResults(ctx context.Context, userID string, firebaseToken string) ([]models.AssessmentResult, error) {
-    authClient, err := config.App.Auth(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("failed to initialize auth client: %w", err)
-    }
-
-    _, err = authClient.VerifyIDToken(ctx, firebaseToken)
-    if err != nil {
-        return nil, fmt.Errorf("invalid Firebase token: %w", err)
-    }
-
     firestoreClient, err := config.App.Firestore(ctx)
     if err != nil {
         return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
     }
     defer firestoreClient.Close()
 
-    // Hitung total soal per jenis dari koleksi assessmentQuestions
     totalQuestions := map[string]int{
         "visual":      0,
         "auditory":    0,
@@ -469,7 +399,6 @@ func GetAssessmentResults(ctx context.Context, userID string, firebaseToken stri
         }
     }
 
-    // Inisialisasi hasil default untuk semua jenis
     results := []models.AssessmentResult{
         {Type: "visual", CorrectAnswers: 0, TotalQuestions: totalQuestions["visual"], Status: "not started"},
         {Type: "auditory", CorrectAnswers: 0, TotalQuestions: totalQuestions["auditory"], Status: "not started"},
@@ -477,10 +406,8 @@ func GetAssessmentResults(ctx context.Context, userID string, firebaseToken stri
         {Type: "tactile", CorrectAnswers: 0, TotalQuestions: totalQuestions["tactile"], Status: "not started"},
     }
 
-    // Periksa semua jenis yang mungkin ada, bukan hanya yang terdeteksi di typeDocs
     for _, result := range results {
         typeName := result.Type
-        // Ambil semua submission untuk type ini
         submissionDocs, err := firestoreClient.Collection("users").Doc(userID).Collection("assessments").Doc(typeName).Collection("submissions").Documents(ctx).GetAll()
         if err != nil {
             if status.Code(err) == codes.NotFound {
@@ -491,18 +418,16 @@ func GetAssessmentResults(ctx context.Context, userID string, firebaseToken stri
             continue
         }
 
-        // Hitung total correctAnswers untuk type ini
         correctAnswers := 0
         for _, subDoc := range submissionDocs {
             data := subDoc.Data()
             if correct, ok := data["correctAnswers"].(int64); ok {
                 correctAnswers += int(correct)
             } else if correct, ok := data["correctAnswers"].(int); ok {
-                correctAnswers += correct // Tambahkan penanganan untuk tipe int jika ada
+                correctAnswers += correct
             }
         }
 
-        // Update hasil untuk type ini
         for i, r := range results {
             if r.Type == typeName {
                 results[i].CorrectAnswers = correctAnswers
