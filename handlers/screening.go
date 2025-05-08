@@ -1,18 +1,18 @@
 package handlers
 
 import (
-	"encoding/json"
-	"log"
-	"net/http"
-	"strconv"
+    "encoding/json"
+    "log"
+    "net/http"
+    "strconv"
 
-	"github.com/dzuura/neurodyx-be/config"
-	"github.com/dzuura/neurodyx-be/middleware"
-	"github.com/dzuura/neurodyx-be/models"
-	"github.com/dzuura/neurodyx-be/services"
+    "github.com/dzuura/neurodyx-be/config"
+    "github.com/dzuura/neurodyx-be/middleware"
+    "github.com/dzuura/neurodyx-be/models"
+    "github.com/dzuura/neurodyx-be/services"
 )
 
-// AddScreeningQuestionHandler creates a new screening question
+// AddScreeningQuestionHandler creates a new screening question.
 func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 
@@ -48,7 +48,7 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"questionID": questionID})
 }
 
-// GetScreeningQuestionsHandler retrieves screening questions based on age group
+// GetScreeningQuestionsHandler retrieves screening questions based on ageGroup.
 func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 
@@ -80,7 +80,7 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(questions)
 }
 
-// SubmitScreeningHandler processes and saves screening submissions
+// SubmitScreeningHandler processes and saves screening submissions.
 func SubmitScreeningHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
 

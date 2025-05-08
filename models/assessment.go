@@ -1,10 +1,12 @@
 package models
 
+// Point represents a coordinate point with X and Y values.
 type Point struct {
     X int `json:"x"`
     Y int `json:"y"`
 }
 
+// AssessmentQuestion represents a single assessment question with various types and answer formats.
 type AssessmentQuestion struct {
     ID             string            `json:"id"`
     Type           string            `json:"type"`
@@ -21,11 +23,13 @@ type AssessmentQuestion struct {
     PathData       []Point           `json:"pathData,omitempty"`
 }
 
+// AssessmentSubmission represents a user's submission for an assessment question.
 type AssessmentSubmission struct {
     QuestionID string      `json:"questionID"`
     Answer     interface{} `json:"answer"`
 }
 
+// AssessmentResult represents the result of a user's assessment for a specific type.
 type AssessmentResult struct {
     Type           string `json:"type"`
     CorrectAnswers int    `json:"correctAnswers"`

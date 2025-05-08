@@ -1,12 +1,11 @@
 package services
 
-
-// ValidateStringMatch checks if the user's string answer matches the correct answer
+// ValidateStringMatch checks if the user's string answer matches the correct answer.
 func ValidateStringMatch(userAnswer, correctAnswer string) bool {
     return userAnswer == correctAnswer
 }
 
-// ValidateSequence checks if the user's sequence matches the correct sequence exactly
+// ValidateSequence checks if the user's sequence matches the correct sequence exactly.
 func ValidateSequence(userSequence, correctSequence []string) bool {
     if len(userSequence) != len(correctSequence) {
         return false
@@ -19,7 +18,7 @@ func ValidateSequence(userSequence, correctSequence []string) bool {
     return true
 }
 
-// ValidatePairs checks if the user's pairs match the correct pairs
+// ValidatePairs checks if the user's pairs match the correct pairs.
 func ValidatePairs(userPairs []map[string]string, correctPairs map[string]string) bool {
     userPairMap := make(map[string]string)
     for _, pair := range userPairs {

@@ -23,28 +23,32 @@ func main() {
         log.Fatalf("Failed to initialize Firebase: %v", err)
     }
 
+    // Setup rate limiters
+    authLimiterStore := middleware.NewLimiterStore()
+    refreshLimiterStore := middleware.NewLimiterStore()
+
     // Setup router
     r := mux.NewRouter()
 
     // Public routes
-    r.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+    r.HandleFunc("/api/health", middleware.PanicRecoveryMiddleware(func(w http.ResponseWriter, r *http.Request) {
         w.Write([]byte("Neurodyx Backend is running"))
-    }).Methods("GET")
-    r.HandleFunc("/api/auth", handlers.AuthHandler).Methods("POST")
-    r.HandleFunc("/api/refresh", handlers.RefreshHandler).Methods("POST")
+    })).Methods("GET")
+    r.HandleFunc("/api/auth", middleware.PanicRecoveryMiddleware(middleware.RateLimitMiddleware(authLimiterStore, handlers.AuthHandler))).Methods("POST")
+    r.HandleFunc("/api/refresh", middleware.PanicRecoveryMiddleware(middleware.RateLimitMiddleware(refreshLimiterStore, handlers.RefreshHandler))).Methods("POST")
 
     // Protected routes for screening
     screeningRouter := r.PathPrefix("/api/screening").Subrouter()
-    screeningRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler)).Methods("POST")
-    screeningRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler)).Methods("GET")
-    screeningRouter.HandleFunc("/submit", middleware.AuthMiddleware(handlers.SubmitScreeningHandler)).Methods("POST")
+    screeningRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler))).Methods("POST")
+    screeningRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler))).Methods("GET")
+    screeningRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitScreeningHandler))).Methods("POST")
 
     // Protected routes for assessment
     assessmentRouter := r.PathPrefix("/api/assessment").Subrouter()
-    assessmentRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.AddAssessmentQuestionHandler)).Methods("POST")
-    assessmentRouter.HandleFunc("/questions", middleware.AuthMiddleware(handlers.GetAssessmentQuestionsHandler)).Methods("GET")
-    assessmentRouter.HandleFunc("/submit", middleware.AuthMiddleware(handlers.SubmitAnswerHandler)).Methods("POST")
-    assessmentRouter.HandleFunc("/results", middleware.AuthMiddleware(handlers.GetAssessmentResultsHandler)).Methods("GET")
+    assessmentRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddAssessmentQuestionHandler))).Methods("POST")
+    assessmentRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetAssessmentQuestionsHandler))).Methods("GET")
+    assessmentRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitAnswerHandler))).Methods("POST")
+    assessmentRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetAssessmentResultsHandler))).Methods("GET")
 
     // Start server
     port := os.Getenv("PORT")

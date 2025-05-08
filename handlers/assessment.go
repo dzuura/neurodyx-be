@@ -1,27 +1,19 @@
 package handlers
 
 import (
-	"encoding/json"
-	"log"
-	"net/http"
-	"strings"
+    "encoding/json"
+    "log"
+    "net/http"
+    "strings"
 
-	"github.com/dzuura/neurodyx-be/config"
-	"github.com/dzuura/neurodyx-be/middleware"
-	"github.com/dzuura/neurodyx-be/models"
-	"github.com/dzuura/neurodyx-be/services"
+    "github.com/dzuura/neurodyx-be/config"
+    "github.com/dzuura/neurodyx-be/middleware"
+    "github.com/dzuura/neurodyx-be/models"
+    "github.com/dzuura/neurodyx-be/services"
 )
 
-// AddAssessmentQuestionHandler creates a new assessment question
+// AddAssessmentQuestionHandler creates a new assessment question.
 func AddAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
-    defer func() {
-        if r := recover(); r != nil {
-            log.Printf("Recovered from panic in AddAssessmentQuestionHandler: %v", r)
-            w.WriteHeader(http.StatusInternalServerError)
-            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
-        }
-    }()
-
     w.Header().Set("Content-Type", "application/json")
 
     var question models.AssessmentQuestion
@@ -62,16 +54,8 @@ func AddAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"questionID": questionID})
 }
 
-// GetAssessmentQuestionsHandler retrieves assessment questions based on type
+// GetAssessmentQuestionsHandler retrieves assessment questions based on type.
 func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
-    defer func() {
-        if r := recover(); r != nil {
-            log.Printf("Recovered from panic in GetAssessmentQuestionsHandler: %v", r)
-            w.WriteHeader(http.StatusInternalServerError)
-            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
-        }
-    }()
-
     w.Header().Set("Content-Type", "application/json")
 
     userID, ok := r.Context().Value(middleware.UserIDKey).(string)
@@ -110,16 +94,8 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(questions)
 }
 
-// SubmitAnswerHandler processes and saves assessment answer submissions
+// SubmitAnswerHandler processes and saves assessment answer submissions.
 func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
-    defer func() {
-        if r := recover(); r != nil {
-            log.Printf("Recovered from panic in SubmitAnswerHandler: %v", r)
-            w.WriteHeader(http.StatusInternalServerError)
-            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
-        }
-    }()
-
     w.Header().Set("Content-Type", "application/json")
 
     var submission struct {
@@ -185,16 +161,8 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-// GetAssessmentResultsHandler retrieves a user's assessment results
+// GetAssessmentResultsHandler retrieves a user's assessment results.
 func GetAssessmentResultsHandler(w http.ResponseWriter, r *http.Request) {
-    defer func() {
-        if r := recover(); r != nil {
-            log.Printf("Recovered from panic in GetAssessmentResultsHandler: %v", r)
-            w.WriteHeader(http.StatusInternalServerError)
-            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Internal server error"})
-        }
-    }()
-
     w.Header().Set("Content-Type", "application/json")
 
     userID, ok := r.Context().Value(middleware.UserIDKey).(string)
