@@ -69,16 +69,18 @@ func SaveScreeningResult(ctx context.Context, userID, ageGroup string, answers [
     }
     defer firestoreClient.Close()
 
-    _, _, err = firestoreClient.Collection("users").Doc(userID).Collection("screenings").Add(ctx, map[string]interface{}{
+    docRef := firestoreClient.Collection("users").Doc(userID).Collection("screenings").Doc("current")
+
+    _, err = docRef.Set(ctx, map[string]interface{}{
         "ageGroup":  ageGroup,
         "answers":   answers,
         "riskLevel": riskLevel,
         "timestamp": firestore.ServerTimestamp,
-    })
+    }, firestore.MergeAll)
     if err != nil {
         return fmt.Errorf("failed to save screening result: %w", err)
     }
 
-    log.Printf("Saved screening result for userID: %s, ageGroup: %s", userID, ageGroup)
+    log.Printf("Updated screening result for userID: %s, ageGroup: %s", userID, ageGroup)
     return nil
 }
