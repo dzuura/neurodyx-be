@@ -50,6 +50,14 @@ func main() {
     assessmentRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitAnswerHandler))).Methods("POST")
     assessmentRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetAssessmentResultsHandler))).Methods("GET")
 
+    // Protected routes for therapy
+    therapyRouter := r.PathPrefix("/api/therapy").Subrouter()
+    therapyRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddTherapyQuestionHandler))).Methods("POST")
+    therapyRouter.HandleFunc("/categories", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyCategoriesHandler))).Methods("GET")
+    therapyRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyQuestionsHandler))).Methods("GET")
+    therapyRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitTherapyAnswerHandler))).Methods("POST")
+    therapyRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyResultsHandler))).Methods("GET")
+
     // Start server
     port := os.Getenv("PORT")
     if port == "" {

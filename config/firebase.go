@@ -20,6 +20,7 @@ var (
     JWTSecret []byte
     AssessmentQuestionCache sync.Map
     ScreeningQuestionCache sync.Map
+    TherapyQuestionCache sync.Map
     cacheCleanupInterval = 5 * time.Minute
 )
 
@@ -76,6 +77,7 @@ func startCacheCleanup() {
     for range ticker.C {
         cleanupCache(&AssessmentQuestionCache)
         cleanupCache(&ScreeningQuestionCache)
+        cleanupCache(&TherapyQuestionCache)
     }
 }
 
