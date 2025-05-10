@@ -11,15 +11,15 @@ import (
     "google.golang.org/grpc/status"
 )
 
-// GetQuestionByID retrieves a question by its ID.
-func GetQuestionByID(ctx context.Context, questionID string) (models.AssessmentQuestion, error) {
+// GetQuestionByID retrieves a question by its ID, type, and category.
+func GetQuestionByID(ctx context.Context, questionType, category, questionID string) (models.AssessmentQuestion, error) {
     firestoreClient, err := GetFirestoreClient(ctx)
     if err != nil {
         return models.AssessmentQuestion{}, fmt.Errorf("failed to connect to Firestore: %w", err)
     }
     defer firestoreClient.Close()
 
-    doc, err := firestoreClient.Collection("assessmentQuestions").Doc(questionID).Get(ctx)
+    doc, err := firestoreClient.Collection("assessmentQuestions").Doc(questionType).Collection(category).Doc(questionID).Get(ctx)
     if err != nil {
         return models.AssessmentQuestion{}, fmt.Errorf("failed to retrieve question: %w", err)
     }
@@ -60,7 +60,7 @@ func GetQuestionByID(ctx context.Context, questionID string) (models.AssessmentQ
         }
     }
 
-    log.Printf("Retrieved question with ID: %s", questionID)
+    log.Printf("Retrieved question with ID: %s, type: %s, category: %s", questionID, questionType, category)
     return q, nil
 }
 
@@ -72,7 +72,7 @@ func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuest
     }
     defer firestoreClient.Close()
 
-    docRef, _, err := firestoreClient.Collection("assessmentQuestions").Add(ctx, map[string]interface{}{
+    docRef, _, err := firestoreClient.Collection("assessmentQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
         "type":            question.Type,
         "category":        question.Category,
         "content":         question.Content,
@@ -90,7 +90,7 @@ func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuest
         return "", fmt.Errorf("failed to save assessment question: %w", err)
     }
 
-    log.Printf("Saved assessment question with ID: %s", docRef.ID)
+    log.Printf("Saved assessment question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
     return docRef.ID, nil
 }
 
@@ -102,66 +102,72 @@ func GetAssessmentQuestions(ctx context.Context, questionType string, userID str
     }
     defer firestoreClient.Close()
 
-    var docs []*firestore.DocumentSnapshot
-    if questionType != "" {
-        docs, err = firestoreClient.Collection("assessmentQuestions").Where("type", "==", questionType).Documents(ctx).GetAll()
-    } else {
-        docs, err = firestoreClient.Collection("assessmentQuestions").Documents(ctx).GetAll()
-    }
+    questions := make([]models.AssessmentQuestion, 0)
+
+    categoriesIter := firestoreClient.Collection("assessmentQuestions").Doc(questionType).Collections(ctx)
+    categories, err := categoriesIter.GetAll()
     if err != nil {
-        return nil, fmt.Errorf("failed to retrieve assessment questions: %w", err)
+        return nil, fmt.Errorf("failed to retrieve categories for type %s: %w", questionType, err)
     }
 
-    questions := make([]models.AssessmentQuestion, 0, len(docs))
-    for _, doc := range docs {
-        var q models.AssessmentQuestion
-        data := doc.Data()
-        q.ID = doc.Ref.ID
-        q.Type = data["type"].(string)
-        q.Category = data["category"].(string)
-        if content, ok := data["content"].(string); ok {
-            q.Content = content
+    for _, category := range categories {
+        categoryName := category.ID
+        docs, err := category.Documents(ctx).GetAll()
+        if err != nil {
+            log.Printf("Failed to retrieve questions for type %s, category %s: %v", questionType, categoryName, err)
+            continue
         }
-        if imageURL, ok := data["imageURL"].(string); ok {
-            q.ImageURL = imageURL
-        }
-        if soundURL, ok := data["soundURL"].(string); ok {
-            q.SoundURL = soundURL
-        }
-        if options, ok := data["options"].([]interface{}); ok {
-            q.Options = make([]string, len(options))
-            for i, opt := range options {
-                q.Options[i] = opt.(string)
+
+        for _, doc := range docs {
+            var q models.AssessmentQuestion
+            data := doc.Data()
+            q.ID = doc.Ref.ID
+            q.Type = data["type"].(string)
+            q.Category = data["category"].(string)
+            if content, ok := data["content"].(string); ok {
+                q.Content = content
             }
-        }
-        if leftItems, ok := data["leftItems"].([]interface{}); ok {
-            q.LeftItems = make([]string, len(leftItems))
-            for i, item := range leftItems {
-                q.LeftItems[i] = item.(string)
+            if imageURL, ok := data["imageURL"].(string); ok {
+                q.ImageURL = imageURL
             }
-        }
-        if rightItems, ok := data["rightItems"].([]interface{}); ok {
-            q.RightItems = make([]string, len(rightItems))
-            for i, item := range rightItems {
-                q.RightItems[i] = item.(string)
+            if soundURL, ok := data["soundURL"].(string); ok {
+                q.SoundURL = soundURL
             }
-        }
-        if correctAnswer, ok := data["correctAnswer"].(string); ok {
-            q.CorrectAnswer = correctAnswer
-        }
-        if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
-            q.CorrectSequence = make([]string, len(correctSeq))
-            for i, seq := range correctSeq {
-                q.CorrectSequence[i] = seq.(string)
+            if options, ok := data["options"].([]interface{}); ok {
+                q.Options = make([]string, len(options))
+                for i, opt := range options {
+                    q.Options[i] = opt.(string)
+                }
             }
-        }
-        if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
-            q.CorrectPairs = make(map[string]string)
-            for k, v := range correctPairs {
-                q.CorrectPairs[k] = v.(string)
+            if leftItems, ok := data["leftItems"].([]interface{}); ok {
+                q.LeftItems = make([]string, len(leftItems))
+                for i, item := range leftItems {
+                    q.LeftItems[i] = item.(string)
+                }
             }
+            if rightItems, ok := data["rightItems"].([]interface{}); ok {
+                q.RightItems = make([]string, len(rightItems))
+                for i, item := range rightItems {
+                    q.RightItems[i] = item.(string)
+                }
+            }
+            if correctAnswer, ok := data["correctAnswer"].(string); ok {
+                q.CorrectAnswer = correctAnswer
+            }
+            if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
+                q.CorrectSequence = make([]string, len(correctSeq))
+                for i, seq := range correctSeq {
+                    q.CorrectSequence[i] = seq.(string)
+                }
+            }
+            if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
+                q.CorrectPairs = make(map[string]string)
+                for k, v := range correctPairs {
+                    q.CorrectPairs[k] = v.(string)
+                }
+            }
+            questions = append(questions, q)
         }
-        questions = append(questions, q)
     }
 
     log.Printf("Retrieved %d assessment questions for type: %s", len(questions), questionType)
@@ -176,9 +182,64 @@ func SaveAssessmentResult(ctx context.Context, userID string, submission models.
     }
     defer firestoreClient.Close()
 
-    question, err := GetQuestionByID(ctx, submission.QuestionID)
-    if err != nil {
-        return models.AssessmentResult{}, fmt.Errorf("failed to fetch question: %w", err)
+    var question models.AssessmentQuestion
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("assessmentQuestions").Doc(t).Collections(ctx)
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            continue
+        }
+        for _, category := range categories {
+            doc, err := category.Doc(submission.QuestionID).Get(ctx)
+            if err == nil && doc.Exists() {
+                data := doc.Data()
+                question.ID = doc.Ref.ID
+                question.Type = data["type"].(string)
+                question.Category = data["category"].(string)
+                if options, ok := data["options"].([]interface{}); ok {
+                    question.Options = make([]string, len(options))
+                    for i, opt := range options {
+                        question.Options[i] = opt.(string)
+                    }
+                }
+                if leftItems, ok := data["leftItems"].([]interface{}); ok {
+                    question.LeftItems = make([]string, len(leftItems))
+                    for i, item := range leftItems {
+                        question.LeftItems[i] = item.(string)
+                    }
+                }
+                if rightItems, ok := data["rightItems"].([]interface{}); ok {
+                    question.RightItems = make([]string, len(rightItems))
+                    for i, item := range rightItems {
+                        question.RightItems[i] = item.(string)
+                    }
+                }
+                if correctAnswer, ok := data["correctAnswer"].(string); ok {
+                    question.CorrectAnswer = correctAnswer
+                }
+                if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
+                    question.CorrectSequence = make([]string, len(correctSeq))
+                    for i, seq := range correctSeq {
+                        question.CorrectSequence[i] = seq.(string)
+                    }
+                }
+                if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
+                    question.CorrectPairs = make(map[string]string)
+                    for k, v := range correctPairs {
+                        question.CorrectPairs[k] = v.(string)
+                    }
+                }
+                break
+            }
+        }
+        if question.ID != "" {
+            break
+        }
+    }
+
+    if question.ID == "" {
+        return models.AssessmentResult{}, fmt.Errorf("question with ID %s not found", submission.QuestionID)
     }
 
     isCorrect := false
@@ -245,6 +306,7 @@ func SaveAssessmentResult(ctx context.Context, userID string, submission models.
 
     _, err = firestoreClient.Collection("users").Doc(userID).Collection("assessments").Doc(question.Type).Collection("submissions").Doc(submission.QuestionID).Set(ctx, map[string]interface{}{
         "type":           question.Type,
+        "category":       question.Category,
         "questionID":     submission.QuestionID,
         "correctAnswers": result.CorrectAnswers,
         "answer":         submission.Answer,
@@ -274,9 +336,16 @@ func GetAssessmentResults(ctx context.Context, userID string, firebaseToken stri
         "tactile":     0,
     }
     for _, t := range []string{"visual", "auditory", "kinesthetic", "tactile"} {
-        docs, err := firestoreClient.Collection("assessmentQuestions").Where("type", "==", t).Documents(ctx).GetAll()
-        if err == nil {
-            totalQuestions[t] = len(docs)
+        categoriesIter := firestoreClient.Collection("assessmentQuestions").Doc(t).Collections(ctx)
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            continue
+        }
+        for _, category := range categories {
+            docs, err := category.Documents(ctx).GetAll()
+            if err == nil {
+                totalQuestions[t] += len(docs)
+            }
         }
     }
 

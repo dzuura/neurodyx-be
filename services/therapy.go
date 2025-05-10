@@ -19,7 +19,7 @@ func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, u
     }
     defer firestoreClient.Close()
 
-    docRef, _, err := firestoreClient.Collection("therapyQuestions").Add(ctx, map[string]interface{}{
+    docRef, _, err := firestoreClient.Collection("therapyQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
         "type":            question.Type,
         "category":        question.Category,
         "content":         question.Content,
@@ -36,7 +36,7 @@ func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, u
         return "", fmt.Errorf("failed to save therapy question: %w", err)
     }
 
-    log.Printf("Saved therapy question with ID: %s", docRef.ID)
+    log.Printf("Saved therapy question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
     return docRef.ID, nil
 }
 
@@ -48,15 +48,7 @@ func GetTherapyQuestions(ctx context.Context, questionType, category string, use
     }
     defer firestoreClient.Close()
 
-    query := firestoreClient.Collection("therapyQuestions").Query
-    if questionType != "" {
-        query = query.Where("type", "==", questionType)
-    }
-    if category != "" {
-        query = query.Where("category", "==", category)
-    }
-
-    docs, err := query.Documents(ctx).GetAll()
+    docs, err := firestoreClient.Collection("therapyQuestions").Doc(questionType).Collection(category).Documents(ctx).GetAll()
     if err != nil {
         return nil, fmt.Errorf("failed to retrieve therapy questions: %w", err)
     }
@@ -109,14 +101,14 @@ func GetTherapyQuestions(ctx context.Context, questionType, category string, use
 }
 
 // GetTherapyQuestionByID retrieves a therapy question by its ID.
-func GetTherapyQuestionByID(ctx context.Context, questionID string) (models.TherapyQuestion, error) {
+func GetTherapyQuestionByID(ctx context.Context, questionType, category, questionID string) (models.TherapyQuestion, error) {
     firestoreClient, err := GetFirestoreClient(ctx)
     if err != nil {
         return models.TherapyQuestion{}, fmt.Errorf("failed to connect to Firestore: %w", err)
     }
     defer firestoreClient.Close()
 
-    doc, err := firestoreClient.Collection("therapyQuestions").Doc(questionID).Get(ctx)
+    doc, err := firestoreClient.Collection("therapyQuestions").Doc(questionType).Collection(category).Doc(questionID).Get(ctx)
     if err != nil {
         return models.TherapyQuestion{}, fmt.Errorf("failed to retrieve therapy question: %w", err)
     }
@@ -160,7 +152,7 @@ func GetTherapyQuestionByID(ctx context.Context, questionID string) (models.Ther
         }
     }
 
-    log.Printf("Retrieved therapy question with ID: %s", questionID)
+    log.Printf("Retrieved therapy question with ID: %s, type: %s, category: %s", questionID, questionType, category)
     return q, nil
 }
 
@@ -172,29 +164,26 @@ func GetTherapyCategories(ctx context.Context, questionType string) ([]models.Th
     }
     defer firestoreClient.Close()
 
-    docs, err := firestoreClient.Collection("therapyQuestions").Where("type", "==", questionType).Documents(ctx).GetAll()
+    categoriesIter := firestoreClient.Collection("therapyQuestions").Doc(questionType).Collections(ctx)
+    categories, err := categoriesIter.GetAll()
     if err != nil {
-        return nil, fmt.Errorf("failed to retrieve therapy questions: %w", err)
+        return nil, fmt.Errorf("failed to retrieve categories for type %s: %w", questionType, err)
     }
 
-    categories := make(map[string]models.TherapyCategory)
-    for _, doc := range docs {
-        data := doc.Data()
-        if category, ok := data["category"].(string); ok {
-            if description, ok := data["description"].(string); ok {
-                if _, exists := categories[category]; !exists {
-                    categories[category] = models.TherapyCategory{
-                        Category:    category,
-                        Description: description,
-                    }
-                }
-            }
+    categoryList := make([]models.TherapyCategory, 0)
+    for _, category := range categories {
+        categoryName := category.ID
+        docs, err := category.Limit(1).Documents(ctx).GetAll()
+        if err != nil || len(docs) == 0 {
+            continue
         }
-    }
-
-    categoryList := make([]models.TherapyCategory, 0, len(categories))
-    for _, cat := range categories {
-        categoryList = append(categoryList, cat)
+        data := docs[0].Data()
+        if description, ok := data["description"].(string); ok {
+            categoryList = append(categoryList, models.TherapyCategory{
+                Category:    categoryName,
+                Description: description,
+            })
+        }
     }
 
     log.Printf("Retrieved %d categories for type: %s", len(categoryList), questionType)
@@ -209,9 +198,52 @@ func SaveTherapyResult(ctx context.Context, userID string, submission models.The
     }
     defer firestoreClient.Close()
 
-    question, err := GetTherapyQuestionByID(ctx, submission.QuestionID)
-    if err != nil {
-        return models.TherapyResult{}, fmt.Errorf("failed to fetch question: %w", err)
+    var question models.TherapyQuestion
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("therapyQuestions").Doc(t).Collections(ctx)
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            continue
+        }
+        for _, category := range categories {
+            doc, err := category.Doc(submission.QuestionID).Get(ctx)
+            if err == nil && doc.Exists() {
+                data := doc.Data()
+                question.ID = doc.Ref.ID
+                question.Type = data["type"].(string)
+                question.Category = data["category"].(string)
+                if options, ok := data["options"].([]interface{}); ok {
+                    question.Options = make([]string, len(options))
+                    for i, opt := range options {
+                        question.Options[i] = opt.(string)
+                    }
+                }
+                if correctAnswer, ok := data["correctAnswer"].(string); ok {
+                    question.CorrectAnswer = correctAnswer
+                }
+                if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
+                    question.CorrectSequence = make([]string, len(correctSeq))
+                    for i, seq := range correctSeq {
+                        question.CorrectSequence[i] = seq.(string)
+                    }
+                }
+                if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
+                    question.CorrectPairs = make(map[string]string)
+                    for k, v := range correctPairs {
+                        question.CorrectPairs[k] = v.(string)
+                    }
+                }
+                break
+            }
+        }
+        if question.ID != "" {
+            break
+        }
+    }
+
+    if question.ID == "" {
+        return models.TherapyResult{}, fmt.Errorf("therapy question with ID %s not found", submission.QuestionID)
     }
 
     isCorrect := false
@@ -303,7 +335,7 @@ func GetTherapyResults(ctx context.Context, userID, questionType, category strin
     defer firestoreClient.Close()
 
     totalQuestions := 0
-    docs, err := firestoreClient.Collection("therapyQuestions").Where("type", "==", questionType).Where("category", "==", category).Documents(ctx).GetAll()
+    docs, err := firestoreClient.Collection("therapyQuestions").Doc(questionType).Collection(category).Documents(ctx).GetAll()
     if err == nil {
         totalQuestions = len(docs)
     }

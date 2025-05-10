@@ -100,6 +100,7 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
 
     var submission struct {
         Submissions []models.AssessmentSubmission `json:"submissions"`
+        Type        string                        `json:"type"`
     }
     if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
         w.WriteHeader(http.StatusBadRequest)
@@ -107,10 +108,10 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if len(submission.Submissions) == 0 || len(submission.Submissions) > 100 {
-        log.Printf("Received empty or excessive submissions: %d", len(submission.Submissions))
+    if len(submission.Submissions) == 0 || len(submission.Submissions) > 100 || submission.Type == "" {
+        log.Printf("Received invalid submission: submissions: %d, type: %s", len(submission.Submissions), submission.Type)
         w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Submissions cannot be empty or exceed 100"})
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Submissions cannot be empty or exceed 100, and type is required"})
         return
     }
 
@@ -124,37 +125,23 @@ func SubmitAnswerHandler(w http.ResponseWriter, r *http.Request) {
     totalCorrect := 0
     typeMap := make(map[string]int)
     for _, sub := range submission.Submissions {
-        question, err := services.GetQuestionByID(r.Context(), sub.QuestionID)
-        if err != nil {
-            log.Printf("Failed to fetch question %s: %v", sub.QuestionID, err)
-            continue
-        }
-
         result, err := services.SaveAssessmentResult(r.Context(), userID, sub, "")
         if err != nil {
             log.Printf("Error submitting answer for question %s: %v", sub.QuestionID, err)
             continue
         }
         totalCorrect += result.CorrectAnswers
-        typeMap[question.Type] = typeMap[question.Type] + result.CorrectAnswers
-    }
-
-    resultType := ""
-    if len(submission.Submissions) > 0 {
-        question, err := services.GetQuestionByID(r.Context(), submission.Submissions[0].QuestionID)
-        if err == nil {
-            resultType = question.Type
-        }
+        typeMap[submission.Type] = typeMap[submission.Type] + result.CorrectAnswers
     }
 
     result := models.AssessmentResult{
-        Type:           resultType,
+        Type:           submission.Type,
         CorrectAnswers: totalCorrect,
         TotalQuestions: len(submission.Submissions),
         Status:         "completed",
     }
 
-    log.Printf("Successfully processed %d submissions for userID: %s, type: %s, correct: %d", len(submission.Submissions), userID, resultType, totalCorrect)
+    log.Printf("Successfully processed %d submissions for userID: %s, type: %s, correct: %d", len(submission.Submissions), userID, submission.Type, totalCorrect)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]interface{}{
         "result": result,

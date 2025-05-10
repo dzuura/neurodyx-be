@@ -17,7 +17,7 @@ func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestio
     }
     defer firestoreClient.Close()
 
-    docRef, _, err := firestoreClient.Collection("screeningQuestions").Add(ctx, map[string]interface{}{
+    docRef, _, err := firestoreClient.Collection("screeningQuestions").Doc(question.AgeGroup).Collection("questions").Add(ctx, map[string]interface{}{
         "ageGroup":  question.AgeGroup,
         "question":  question.Question,
         "timestamp": firestore.ServerTimestamp,
@@ -26,7 +26,7 @@ func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestio
         return "", fmt.Errorf("failed to save screening question: %w", err)
     }
 
-    log.Printf("Saved screening question with ID: %s", docRef.ID)
+    log.Printf("Saved screening question with ID: %s, ageGroup: %s", docRef.ID, question.AgeGroup)
     return docRef.ID, nil
 }
 
@@ -40,12 +40,25 @@ func GetScreeningQuestions(ctx context.Context, ageGroup string, userID string) 
 
     var docs []*firestore.DocumentSnapshot
     if ageGroup == "" {
-        docs, err = firestoreClient.Collection("screeningQuestions").Documents(ctx).GetAll()
+        ageGroupsIter := firestoreClient.Collection("screeningQuestions").DocumentRefs(ctx)
+        ageGroups, err := ageGroupsIter.GetAll()
+        if err != nil {
+            return nil, fmt.Errorf("failed to retrieve age groups: %w", err)
+        }
+        for _, ageGroupDoc := range ageGroups {
+            ageGroupName := ageGroupDoc.ID
+            groupDocs, err := firestoreClient.Collection("screeningQuestions").Doc(ageGroupName).Collection("questions").Documents(ctx).GetAll()
+            if err != nil {
+                log.Printf("Failed to retrieve questions for ageGroup %s: %v", ageGroupName, err)
+                continue
+            }
+            docs = append(docs, groupDocs...)
+        }
     } else {
-        docs, err = firestoreClient.Collection("screeningQuestions").Where("ageGroup", "==", ageGroup).Documents(ctx).GetAll()
-    }
-    if err != nil {
-        return nil, fmt.Errorf("failed to retrieve screening questions: %w", err)
+        docs, err = firestoreClient.Collection("screeningQuestions").Doc(ageGroup).Collection("questions").Documents(ctx).GetAll()
+        if err != nil {
+            return nil, fmt.Errorf("failed to retrieve screening questions for ageGroup %s: %w", ageGroup, err)
+        }
     }
 
     questions := make([]models.ScreeningQuestion, 0, len(docs))
