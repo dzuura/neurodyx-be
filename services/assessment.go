@@ -59,25 +59,6 @@ func GetQuestionByID(ctx context.Context, questionID string) (models.AssessmentQ
             q.CorrectPairs[k] = v.(string)
         }
     }
-    if pathData, ok := data["pathData"].([]interface{}); ok {
-        q.PathData = make([]models.Point, len(pathData))
-        for i, p := range pathData {
-            if pointMap, ok := p.(map[string]interface{}); ok {
-                x, xOk := pointMap["x"]
-                y, yOk := pointMap["y"]
-                if xOk && yOk {
-                    q.PathData[i] = models.Point{
-                        X: int(x.(float64)),
-                        Y: int(y.(float64)),
-                    }
-                } else {
-                    q.PathData[i] = models.Point{X: 0, Y: 0}
-                }
-            }
-        }
-    } else {
-        q.PathData = []models.Point{}
-    }
 
     log.Printf("Retrieved question with ID: %s", questionID)
     return q, nil
@@ -103,7 +84,6 @@ func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuest
         "correctAnswer":   question.CorrectAnswer,
         "correctSequence": question.CorrectSequence,
         "correctPairs":    question.CorrectPairs,
-        "pathData":        question.PathData,
         "timestamp":       firestore.ServerTimestamp,
     })
     if err != nil {
@@ -180,25 +160,6 @@ func GetAssessmentQuestions(ctx context.Context, questionType string, userID str
             for k, v := range correctPairs {
                 q.CorrectPairs[k] = v.(string)
             }
-        }
-        if pathData, ok := data["pathData"].([]interface{}); ok {
-            q.PathData = make([]models.Point, len(pathData))
-            for i, p := range pathData {
-                if pointMap, ok := p.(map[string]interface{}); ok {
-                    x, xOk := pointMap["x"]
-                    y, yOk := pointMap["y"]
-                    if xOk && yOk {
-                        q.PathData[i] = models.Point{
-                            X: int(x.(float64)),
-                            Y: int(y.(float64)),
-                        }
-                    } else {
-                        q.PathData[i] = models.Point{X: 0, Y: 0}
-                    }
-                }
-            }
-        } else {
-            q.PathData = []models.Point{}
         }
         questions = append(questions, q)
     }

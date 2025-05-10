@@ -30,7 +30,6 @@ func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, u
         "correctAnswer":   question.CorrectAnswer,
         "correctSequence": question.CorrectSequence,
         "correctPairs":    question.CorrectPairs,
-        "pathData":        question.PathData,
         "timestamp":       firestore.ServerTimestamp,
     })
     if err != nil {
@@ -102,25 +101,6 @@ func GetTherapyQuestions(ctx context.Context, questionType, category string, use
                 q.CorrectPairs[k] = v.(string)
             }
         }
-        if pathData, ok := data["pathData"].([]interface{}); ok {
-            q.PathData = make([]models.Point, len(pathData))
-            for i, p := range pathData {
-                if pointMap, ok := p.(map[string]interface{}); ok {
-                    x, xOk := pointMap["x"]
-                    y, yOk := pointMap["y"]
-                    if xOk && yOk {
-                        q.PathData[i] = models.Point{
-                            X: int(x.(float64)),
-                            Y: int(y.(float64)),
-                        }
-                    } else {
-                        q.PathData[i] = models.Point{X: 0, Y: 0}
-                    }
-                }
-            }
-        } else {
-            q.PathData = []models.Point{}
-        }
         questions = append(questions, q)
     }
 
@@ -178,25 +158,6 @@ func GetTherapyQuestionByID(ctx context.Context, questionID string) (models.Ther
         for k, v := range correctPairs {
             q.CorrectPairs[k] = v.(string)
         }
-    }
-    if pathData, ok := data["pathData"].([]interface{}); ok {
-        q.PathData = make([]models.Point, len(pathData))
-        for i, p := range pathData {
-            if pointMap, ok := p.(map[string]interface{}); ok {
-                x, xOk := pointMap["x"]
-                y, yOk := pointMap["y"]
-                if xOk && yOk {
-                    q.PathData[i] = models.Point{
-                        X: int(x.(float64)),
-                        Y: int(y.(float64)),
-                    }
-                } else {
-                    q.PathData[i] = models.Point{X: 0, Y: 0}
-                }
-            }
-        }
-    } else {
-        q.PathData = []models.Point{}
     }
 
     log.Printf("Retrieved therapy question with ID: %s", questionID)

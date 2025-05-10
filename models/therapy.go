@@ -13,7 +13,6 @@ type TherapyQuestion struct {
     CorrectAnswer  string            `json:"correctAnswer,omitempty"`
     CorrectSequence []string         `json:"correctSequence,omitempty"`
     CorrectPairs   map[string]string `json:"correctPairs,omitempty"`
-    PathData       []Point           `json:"pathData,omitempty"`
 }
 
 // TherapySubmission represents a user's submission for a therapy question.
