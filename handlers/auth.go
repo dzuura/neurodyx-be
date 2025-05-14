@@ -11,7 +11,7 @@ import (
     "time"
 
     "cloud.google.com/go/firestore"
-    "github.com/dgrijalva/jwt-go"
+    "github.com/golang-jwt/jwt/v5"
     "github.com/dzuura/neurodyx-be/config"
     "github.com/dzuura/neurodyx-be/models"
     "google.golang.org/api/idtoken"
@@ -167,21 +167,23 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
     defer cancel()
 
     tokenChan := make(chan *jwt.Token, 1)
+    var parseErr error
 
     go func() {
-        token, _ := jwt.Parse(req.RefreshToken, func(token *jwt.Token) (interface{}, error) {
+        token, err := jwt.Parse(req.RefreshToken, func(token *jwt.Token) (interface{}, error) {
             if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
                 return nil, fmt.Errorf("unexpected signing method")
             }
             return config.JWTSecret, nil
         })
+        parseErr = err
         tokenChan <- token
     }()
 
     var token *jwt.Token
     select {
     case token = <-tokenChan:
-        if !token.Valid {
+        if parseErr != nil || token == nil {
             w.WriteHeader(http.StatusUnauthorized)
             json.NewEncoder(w).Encode(models.AuthResponse{Error: "Invalid or expired refresh token"})
             return
@@ -196,6 +198,13 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
     if !ok {
         w.WriteHeader(http.StatusUnauthorized)
         json.NewEncoder(w).Encode(models.AuthResponse{Error: "Invalid token claims"})
+        return
+    }
+
+    exp, ok := claims["exp"].(float64)
+    if !ok || time.Now().Unix() > int64(exp) {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.AuthResponse{Error: "Expired refresh token"})
         return
     }
 

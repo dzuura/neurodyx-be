@@ -8,7 +8,7 @@ import (
     "time"
     "fmt"
 
-    "github.com/dgrijalva/jwt-go"
+    "github.com/golang-jwt/jwt/v5"
     "github.com/dzuura/neurodyx-be/config"
 )
 
@@ -47,16 +47,17 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
             return
         }
 
-        if !token.Valid {
-            log.Printf("Token invalid for %s %s", r.Method, r.URL.Path)
-            http.Error(w, "Invalid token", http.StatusUnauthorized)
+        claims, ok := token.Claims.(jwt.MapClaims)
+        if !ok {
+            log.Printf("Token claims invalid for %s %s", r.Method, r.URL.Path)
+            http.Error(w, "Invalid token claims", http.StatusUnauthorized)
             return
         }
 
-        claims, ok := token.Claims.(jwt.MapClaims)
-        if !ok || !claims.VerifyExpiresAt(time.Now().Unix(), false) {
-            log.Printf("Token claims invalid for %s %s", r.Method, r.URL.Path)
-            http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+        exp, ok := claims["exp"].(float64)
+        if !ok || time.Now().Unix() > int64(exp) {
+            log.Printf("Token expired for %s %s", r.Method, r.URL.Path)
+            http.Error(w, "Token expired", http.StatusUnauthorized)
             return
         }
 

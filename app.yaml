@@ -1,0 +1,14 @@
+runtime: go122
+env: standard
+
+handlers:
+- url: /.*
+  script: auto
+
+env_variables:
+  JWT_SECRET: SpiO5S00do5LnBmSCKx1KczrurOkY6CI
+  FIREBASE_CREDENTIALS_PATH: /workspace/config/serviceAccountKey.json
+  GOOGLE_CLIENT_ID: 248321898441-58gde0gbnln0jj4bek05r5bpmrvi72uc.apps.googleusercontent.com
+
+automatic_scaling:
+  max_instances: 10

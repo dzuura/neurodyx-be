@@ -5,8 +5,8 @@ import (
     "net/http"
     "os"
 
-    "github.com/gorilla/mux"
     "github.com/joho/godotenv"
+    "github.com/gorilla/mux"
     "github.com/dzuura/neurodyx-be/config"
     "github.com/dzuura/neurodyx-be/handlers"
     "github.com/dzuura/neurodyx-be/middleware"
