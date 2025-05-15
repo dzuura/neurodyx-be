@@ -76,16 +76,10 @@ func logAndReturnError(msg string, args ...interface{}) error {
 // StoreInCache stores data in the cache with a specified expiration
 func StoreInCache(cache *cache.Cache, key, value interface{}) {
 	cache.Set(fmt.Sprintf("%v", key), value, cacheExpiration)
-    log.Printf("Stored in cache with key: %v, expires in: %v", key, cacheExpiration)
 }
 
 // LoadFromCache retrieves data from the cache if it exists
 func LoadFromCache(cache *cache.Cache, key interface{}) (interface{}, bool) {
 	val, found := cache.Get(fmt.Sprintf("%v", key))
-    if found {
-        log.Printf("Cache hit for key: %v", key)
-    } else {
-        log.Printf("Cache miss for key: %v", key)
-    }
 	return val, found
 }

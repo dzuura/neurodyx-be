@@ -154,6 +154,11 @@ func SubmitTherapyAnswerHandler(w http.ResponseWriter, r *http.Request) {
         totalCorrect += result.CorrectAnswers
     }
 
+    _, err := services.UpdateDailyProgress(r.Context(), userID, submission.Type, submission.Category)
+    if err != nil {
+        log.Printf("Error updating daily progress for userID %s: %v", userID, err)
+    }
+
     result := models.TherapyResult{
         Type:           submission.Type,
         Category:       submission.Category,

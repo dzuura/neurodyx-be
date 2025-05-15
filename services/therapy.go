@@ -4,6 +4,7 @@ import (
     "context"
     "fmt"
     "log"
+    "time"
 
     "cloud.google.com/go/firestore"
     "github.com/dzuura/neurodyx-be/models"
@@ -373,5 +374,157 @@ func GetTherapyResults(ctx context.Context, userID, questionType, category strin
     }
 
     log.Printf("Retrieved therapy result for userID: %s, type: %s, category: %s, correct: %d/%d", userID, questionType, category, result.CorrectAnswers, result.TotalQuestions)
+    return result, nil
+}
+
+// UpdateDailyProgress updates the user's daily progress for therapy activities.
+func UpdateDailyProgress(ctx context.Context, userID, questionType, category string) (*models.DailyProgress, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    now := time.Now().UTC()
+    date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+    docID := date.Format("20060102")
+    docRef := firestoreClient.Collection("users").Doc(userID).Collection("progress").Doc(docID)
+
+    var progress models.DailyProgress
+    err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+        doc, err := tx.Get(docRef)
+        if err != nil && !doc.Exists() {
+            progress = models.DailyProgress{
+                UserID:         userID,
+                Date:           date,
+                TherapyCount:   1,
+                StreakAchieved: false,
+            }
+        } else if err != nil {
+            return fmt.Errorf("failed to fetch progress: %w", err)
+        } else {
+            if err := doc.DataTo(&progress); err != nil {
+                return fmt.Errorf("failed to parse progress data: %w", err)
+            }
+            progress.TherapyCount++
+        }
+
+        progress.StreakAchieved = progress.TherapyCount >= 5
+
+        progressData := map[string]interface{}{
+            "userID":         progress.UserID,
+            "date":           progress.Date,
+            "therapyCount":   progress.TherapyCount,
+            "streakAchieved": progress.StreakAchieved,
+        }
+        return tx.Set(docRef, progressData)
+    })
+    if err != nil {
+        return nil, fmt.Errorf("failed to update daily progress: %w", err)
+    }
+
+    log.Printf("Updated daily progress for userID: %s on %s, therapyCount: %d, streak: %v", userID, date.Format("2006-01-02"), progress.TherapyCount, progress.StreakAchieved)
+    return &progress, nil
+}
+
+// GetWeeklyProgress retrieves the user's progress for the last 7 days.
+func GetWeeklyProgress(ctx context.Context, userID string) ([]models.DailyProgress, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    now := time.Now().UTC()
+    endDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+    startDate := endDate.AddDate(0, 0, -6)
+
+    docs, err := firestoreClient.Collection("users").Doc(userID).Collection("progress").
+        Where("date", ">=", startDate).
+        Where("date", "<=", endDate).
+        Documents(ctx).GetAll()
+    if err != nil {
+        return nil, fmt.Errorf("failed to retrieve weekly progress: %w", err)
+    }
+
+    progressMap := make(map[string]models.DailyProgress)
+    for _, doc := range docs {
+        var p models.DailyProgress
+        if err := doc.DataTo(&p); err != nil {
+            log.Printf("Failed to parse progress data for doc %s: %v", doc.Ref.ID, err)
+            continue
+        }
+        progressMap[p.Date.Format("20060102")] = p
+    }
+
+    result := make([]models.DailyProgress, 0, 7)
+    for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+        docID := d.Format("20060102")
+        if p, exists := progressMap[docID]; exists {
+            result = append(result, p)
+        } else {
+            result = append(result, models.DailyProgress{
+                UserID:         userID,
+                Date:           d,
+                TherapyCount:   0,
+                StreakAchieved: false,
+            })
+        }
+    }
+
+    log.Printf("Retrieved weekly progress for userID: %s, entries: %d", userID, len(result))
+    return result, nil
+}
+
+// GetMonthlyProgress retrieves the user's progress for a specific month and year.
+func GetMonthlyProgress(ctx context.Context, userID string, year, month int) ([]models.ProgressDetail, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+    endDate := startDate.AddDate(0, 1, -1)
+
+    docs, err := firestoreClient.Collection("users").Doc(userID).Collection("progress").
+        Where("date", ">=", startDate).
+        Where("date", "<=", endDate).
+        Documents(ctx).GetAll()
+    if err != nil {
+        return nil, fmt.Errorf("failed to retrieve monthly progress: %w", err)
+    }
+
+    progressMap := make(map[string]models.DailyProgress)
+    for _, doc := range docs {
+        var p models.DailyProgress
+        if err := doc.DataTo(&p); err != nil {
+            log.Printf("Failed to parse progress data for doc %s: %v", doc.Ref.ID, err)
+            continue
+        }
+        progressMap[p.Date.Format("20060102")] = p
+    }
+
+    result := make([]models.ProgressDetail, 0, endDate.Day())
+    for day := 1; day <= endDate.Day(); day++ {
+        date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+        docID := date.Format("20060102")
+        status := "inactive"
+
+        if p, exists := progressMap[docID]; exists {
+            if p.StreakAchieved {
+                status = "streak"
+            } else if p.TherapyCount > 0 {
+                status = "active"
+            }
+        }
+
+        result = append(result, models.ProgressDetail{
+            Date:   date,
+            Status: status,
+        })
+    }
+
+    log.Printf("Retrieved monthly progress for userID: %s, year: %d, month: %d, entries: %d", userID, year, month, len(result))
     return result, nil
 }

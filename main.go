@@ -58,6 +58,11 @@ func main() {
     therapyRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitTherapyAnswerHandler))).Methods("POST")
     therapyRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyResultsHandler))).Methods("GET")
 
+    // Protected routes for progress tracking
+    progressRouter := r.PathPrefix("/api/progress").Subrouter()
+    progressRouter.HandleFunc("/weekly", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetWeeklyProgressHandler))).Methods("GET")
+    progressRouter.HandleFunc("/monthly", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetMonthlyProgressHandler))).Methods("GET")
+    
     // Start server
     port := os.Getenv("PORT")
     if port == "" {
