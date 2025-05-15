@@ -31,11 +31,16 @@ func NewLimiterStore() *LimiterStore {
     return &LimiterStore{limiters: make(map[string]*rate.Limiter), mu: sync.Mutex{}}
 }
 
-// RateLimitMiddleware enforces rate limiting based on client IP.
+// RateLimitMiddleware enforces rate limiting based on userID if available, otherwise falls back to client IP.
 func RateLimitMiddleware(ls *LimiterStore, next http.HandlerFunc) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        clientIP := r.RemoteAddr
-        if !ls.GetLimiter(clientIP).Allow() {
+        key := r.RemoteAddr
+
+        if userID, ok := r.Context().Value(UserIDKey).(string); ok {
+            key = userID
+        }
+
+        if !ls.GetLimiter(key).Allow() {
             w.Header().Set("Content-Type", "application/json")
             w.WriteHeader(http.StatusTooManyRequests)
             json.NewEncoder(w).Encode(models.AuthResponse{Error: "Rate limit exceeded"})

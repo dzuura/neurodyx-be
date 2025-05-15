@@ -61,7 +61,7 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if cached, ok := config.LoadFromCache(&config.ScreeningQuestionCache, ageGroup); ok {
+    if cached, ok := config.LoadFromCache(config.ScreeningQuestionCache, ageGroup); ok {
         w.WriteHeader(http.StatusOK)
         json.NewEncoder(w).Encode(cached)
         return
@@ -75,7 +75,7 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    config.StoreInCache(&config.ScreeningQuestionCache, ageGroup, questions)
+    config.StoreInCache(config.ScreeningQuestionCache, ageGroup, questions)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
 }

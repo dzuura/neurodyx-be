@@ -75,7 +75,7 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 
     questions := []models.AssessmentQuestion{}
     for _, t := range typeFilters {
-        if cached, ok := config.LoadFromCache(&config.AssessmentQuestionCache, t); ok {
+        if cached, ok := config.LoadFromCache(config.AssessmentQuestionCache, t); ok {
             questions = append(questions, cached.([]models.AssessmentQuestion)...)
             continue
         }
@@ -87,7 +87,7 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
             return
         }
         questions = append(questions, qs...)
-        config.StoreInCache(&config.AssessmentQuestionCache, t, qs)
+        config.StoreInCache(config.AssessmentQuestionCache, t, qs)
     }
 
     w.WriteHeader(http.StatusOK)

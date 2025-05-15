@@ -9,6 +9,7 @@ require (
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	golang.org/x/time v0.11.0
 	google.golang.org/api v0.230.0
 	google.golang.org/grpc v1.72.0

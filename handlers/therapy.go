@@ -96,7 +96,7 @@ func GetTherapyQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     cacheKey := questionType + ":" + category
-    if cached, ok := config.LoadFromCache(&config.TherapyQuestionCache, cacheKey); ok {
+    if cached, ok := config.LoadFromCache(config.TherapyQuestionCache, cacheKey); ok {
         w.WriteHeader(http.StatusOK)
         json.NewEncoder(w).Encode(cached)
         return
@@ -110,7 +110,7 @@ func GetTherapyQuestionsHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    config.StoreInCache(&config.TherapyQuestionCache, cacheKey, questions)
+    config.StoreInCache(config.TherapyQuestionCache, cacheKey, questions)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
 }
