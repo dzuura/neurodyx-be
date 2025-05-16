@@ -1,0 +1,1088 @@
+{
+	"info": {
+		"_postman_id": "dd87aee6-6764-445f-9c17-e586081e6ec1",
+		"name": "Neurodyx",
+		"description": "API collection for Neurodyx, a therapy, assessment, and screening service integrated with Firebase. This collection includes endpoints for user authentication, screening, assessment, therapy, and progress tracking.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39730752",
+		"_collection_link": "https://galactic-station-495415.postman.co/workspace/74033166-246a-4e69-8123-217484a3ea9a/collection/39730752-dd87aee6-6764-445f-9c17-e586081e6ec1?action=share&source=collection_link&creator=39730752"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Firebase Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"your-email\",\r\n  \"password\": \"your-password\",\r\n  \"returnSecureToken\": true\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={{firebase_api_key}}",
+							"protocol": "https",
+							"host": [
+								"identitytoolkit",
+								"googleapis",
+								"com"
+							],
+							"path": [
+								"v1",
+								"accounts:signUp"
+							],
+							"query": [
+								{
+									"key": "key",
+									"value": "{{firebase_api_key}}"
+								}
+							]
+						},
+						"description": "Register a new user with Firebase Authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Firebase Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"your-email\",\r\n  \"password\": \"your-password\",\r\n  \"returnSecureToken\": true\r\n}\r\n\r\n// admin account\r\n// {\r\n//   \"email\": \"armada41@example.com\", // admin account\r\n//   \"password\": \"neurodyx2025\",\r\n//   \"returnSecureToken\": true\r\n// }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{firebase_api_key}}",
+							"protocol": "https",
+							"host": [
+								"identitytoolkit",
+								"googleapis",
+								"com"
+							],
+							"path": [
+								"v1",
+								"accounts:signInWithPassword"
+							],
+							"query": [
+								{
+									"key": "key",
+									"value": "{{firebase_api_key}}"
+								}
+							]
+						},
+						"description": "Log in an existing user with Firebase Authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Authenticate User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"if (response.token) {",
+									"    pm.collectionVariables.set('token', response.token);",
+									"    pm.test(\"Token authenticated\", function () {",
+									"        pm.expect(response).to.have.property('token');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"token\": \"your-firebase-or-google-id-token\",\r\n  \"authType\": \"firebase\" // firebase or google\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth"
+							]
+						},
+						"description": "Authenticate a user token (Firebase or Google) and set it as a collection variable."
+					},
+					"response": []
+				},
+				{
+					"name": "Generate New Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"if (response.token) {",
+									"    pm.collectionVariables.set('token', response.token);",
+									"    pm.test(\"Refresh token generated\", function () {",
+									"        pm.expect(response).to.have.property('token');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"refreshToken\": \"your-refresh-token\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"refresh"
+							]
+						},
+						"description": "Generate a new access token using a refresh token."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints related to user authentication using Firebase Authentication and custom token validation. This group handles user registration, login, token authentication, and refresh token generation."
+		},
+		{
+			"name": "Screening",
+			"item": [
+				{
+					"name": "Get Screening Question",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/screening/questions?ageGroup=adult",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"screening",
+								"questions"
+							],
+							"query": [
+								{
+									"key": "ageGroup",
+									"value": "adult",
+									"description": "Filter questions by age group (e.g., adult, kid)"
+								}
+							]
+						},
+						"description": "Retrieve screening questions for a specific age group."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Screening Submissions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ageGroup\": \"adult\",\r\n  \"answers\": [true, false, false, false, false, false, true, true, true, true]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/screening/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"screening",
+								"submit"
+							]
+						},
+						"description": "Submit answers for a screening session."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Screening Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ageGroup\": \"adult\",\r\n  \"question\": \"Do you avoid work projects or courses that require extensive reading?\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/screening/questions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"screening",
+								"questions"
+							]
+						},
+						"description": "Submit answers for a screening session."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Screening Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"ageGroup\": \"adult\",\r\n    \"question\": \"Updated screening question for adult\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/screening/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"screening",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Screening Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/screening/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"screening",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing screening questions and submissions. These are used to assess initial user conditions based on age group-specific questions. Admin access may be required for adding, updating, or deleting questions."
+		},
+		{
+			"name": "Assessment",
+			"item": [
+				{
+					"name": "Get Assessment Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/assessment/questions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"questions"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "visual",
+									"description": "Filter by assessment type (e.g., visual, auditory)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Retrieve all assessment questions."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Assessment Submissions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"type\": \"auditory\",\r\n  \"submissions\": [\r\n    {\"questionId\": \"chi5Fq0wIh1wCisd77bn\", \"answer\": \"p\"},\r\n    {\"questionId\": \"3mqBXkGXrGBW8UBEjIok\", \"answer\": \"cat\"}\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/assessment/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"submit"
+							]
+						},
+						"description": "Submit answers for assessment questions."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Assessment Result",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/assessment/results",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"results"
+							]
+						},
+						"description": "Retrieve assessment results for the authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Assessment Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"type\": \"visual\",\r\n  \"category\": \"letter_recognition\",\r\n  \"content\": \"m\",\r\n  \"options\": [\"w\", \"m\"],\r\n  \"correctAnswer\": \"m\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/assessment/questions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"questions"
+							]
+						},
+						"description": "Add a new assessment question with type, category, content, options, and correct answer."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Assessment Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"type\": \"visual\",\r\n  \"category\": \"letter_recognition\",\r\n  \"content\": \"x\",\r\n  \"options\": [\"x\", \"o\"],\r\n  \"correctAnswer\": \"x\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/assessment/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Assessment Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/assessment/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"assessment",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing assessment questions and submissions. Assessments are categorized by type (visual, auditory, kinesthetic, tactile) and category, designed to evaluate user skills. Admin access is required for adding, updating, or deleting questions."
+		},
+		{
+			"name": "Therapy",
+			"item": [
+				{
+					"name": "Get Therapy Categories",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/categories?type=kinesthetic",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"categories"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "kinesthetic",
+									"description": "Filter categories by therapy type (e.g., visual, auditory, kinesthetic)"
+								}
+							]
+						},
+						"description": "Retrieve therapy categories for a specific type."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Therapy Question",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/questions?type=kinesthetic&category=number_letter_similarity",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"questions"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "kinesthetic",
+									"description": "Filter questions by therapy type (e.g., visual, auditory)"
+								},
+								{
+									"key": "category",
+									"value": "number_letter_similarity",
+									"description": "Filter questions by category (e.g., letter_recognition, word_recognition)"
+								}
+							]
+						},
+						"description": "Retrieve therapy questions for a specific type and category."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Therapy Submissions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"type\": \"visual\",\r\n    \"category\": \"letter_recognition\",\r\n    \"submissions\": [\r\n        {\r\n            \"questionID\": \"rxaDXgybuGbAF9gUVO4A\",\r\n            \"answer\": \"c\"\r\n        },\r\n        {\r\n            \"questionID\": \"xIkqNlZAEgKbUXnudgx7\",\r\n            \"answer\": \"a\"\r\n        }\r\n    ]\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"submit"
+							]
+						},
+						"description": "Submit answers for therapy questions."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Therapy Result",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/results?type=tactile&category=complete_the_word_by_touch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"results"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "tactile",
+									"description": "Filter results by therapy type (e.g., tactile, visual)"
+								},
+								{
+									"key": "category",
+									"value": "complete_the_word_by_touch",
+									"description": "Filter results by category (e.g., complete_the_word_by_touch)"
+								}
+							]
+						},
+						"description": "Retrieve therapy results for a specific type and category."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Therapy Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"type\": \"tactile\",\r\n  \"category\": \"word_recognition_by_touch\",\r\n  \"description\": \"Can you draw this letter? Try writing it in the box!\",\r\n  \"content\": \"w\",\r\n  \"soundURL\": \"https://firebasestorage.googleapis.com/v0/b/neurodyx-e262d.firebasestorage.app/o/media%2Ftherapy%2Ftactile%2Fword_recognition_by_touch%2Fw.mp3?alt=media&token=b667426a-9227-4b01-b286-cb0f4c003e4f\",\r\n  \"correctAnswer\": \"w\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/questions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"questions"
+							]
+						},
+						"description": "Add a new therapy question with type, category, description, content, options, and correct answer."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Therapy Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"type\": \"tactile\",\r\n  \"category\": \"word_recognition_by_touch\",\r\n  \"description\": \"Can you draw this letter? Try writing it in the box!\",\r\n  \"content\": \"M\",\r\n  \"soundURL\": \"https://firebasestorage.googleapis.com/v0/b/neurodyx-e262d.firebasestorage.app/o/media%2Ftherapy%2Ftactile%2Fword_recognition_by_touch%2Fw.mp3?alt=media&token=b667426a-9227-4b01-b286-cb0f4c003e4f\",\r\n  \"correctAnswer\": \"M\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/therapy/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Therapy Question",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/therapy/questions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"therapy",
+								"questions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing therapy questions and submissions. Therapy sessions are categorized by type (visual, auditory, kinesthetic, tactile) and category, designed to improve user skills. Admin access is required for adding, updating, or deleting questions."
+		},
+		{
+			"name": "Progress",
+			"item": [
+				{
+					"name": "Get Weekly Progress",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/progress/weekly",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"progress",
+								"weekly"
+							]
+						},
+						"description": "Retrieve the user's weekly progress."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Monthly Progress",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/progress/monthly",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"progress",
+								"monthly"
+							],
+							"query": [
+								{
+									"key": "year",
+									"value": "2025",
+									"disabled": true
+								},
+								{
+									"key": "month",
+									"value": "4",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Retrieve the user's monthly progress. (Note: URL corrected from /progress/weekly to /progress/monthly)"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for retrieving user progress data, including weekly and monthly summaries. These endpoints help track therapy and assessment activities over time. Accessible to all authenticated users."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "firebase_api_key",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "base_url",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
