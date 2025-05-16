@@ -28,6 +28,8 @@ func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, u
         "imageURL":        question.ImageURL,
         "soundURL":        question.SoundURL,
         "options":         question.Options,
+        "leftItems":       question.LeftItems,
+        "rightItems":      question.RightItems,
         "correctAnswer":   question.CorrectAnswer,
         "correctSequence": question.CorrectSequence,
         "correctPairs":    question.CorrectPairs,

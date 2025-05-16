@@ -10,6 +10,8 @@ type TherapyQuestion struct {
     ImageURL       string            `json:"imageURL,omitempty"`
     SoundURL       string            `json:"soundURL,omitempty"`
     Options        []string          `json:"options,omitempty"`
+    LeftItems      []string          `json:"leftItems,omitempty"`
+    RightItems     []string          `json:"rightItems,omitempty"`
     CorrectAnswer  string            `json:"correctAnswer,omitempty"`
     CorrectSequence []string         `json:"correctSequence,omitempty"`
     CorrectPairs   map[string]string `json:"correctPairs,omitempty"`
