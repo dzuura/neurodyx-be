@@ -39,30 +39,42 @@ func main() {
 
     // Protected routes for screening
     screeningRouter := r.PathPrefix("/api/screening").Subrouter()
-    screeningRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddScreeningQuestionHandler))).Methods("POST")
     screeningRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetScreeningQuestionsHandler))).Methods("GET")
     screeningRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitScreeningHandler))).Methods("POST")
 
+    // Protected admin routes for screening
+    screeningRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.AddScreeningQuestionHandler)))).Methods("POST")
+    screeningRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.UpdateScreeningQuestionHandler)))).Methods("PUT")
+    screeningRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.DeleteScreeningQuestionHandler)))).Methods("DELETE")
+
     // Protected routes for assessment
     assessmentRouter := r.PathPrefix("/api/assessment").Subrouter()
-    assessmentRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddAssessmentQuestionHandler))).Methods("POST")
     assessmentRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetAssessmentQuestionsHandler))).Methods("GET")
     assessmentRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitAnswerHandler))).Methods("POST")
     assessmentRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetAssessmentResultsHandler))).Methods("GET")
 
+    // Protected admin routes for assessment
+    assessmentRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.AddAssessmentQuestionHandler)))).Methods("POST")
+    assessmentRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.UpdateAssessmentQuestionHandler)))).Methods("PUT")
+    assessmentRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.DeleteAssessmentQuestionHandler)))).Methods("DELETE")
+
     // Protected routes for therapy
     therapyRouter := r.PathPrefix("/api/therapy").Subrouter()
-    therapyRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.AddTherapyQuestionHandler))).Methods("POST")
     therapyRouter.HandleFunc("/categories", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyCategoriesHandler))).Methods("GET")
     therapyRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyQuestionsHandler))).Methods("GET")
     therapyRouter.HandleFunc("/submit", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.SubmitTherapyAnswerHandler))).Methods("POST")
     therapyRouter.HandleFunc("/results", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetTherapyResultsHandler))).Methods("GET")
 
+    // Protected admin routes for therapy
+    therapyRouter.HandleFunc("/questions", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.AddTherapyQuestionHandler)))).Methods("POST")
+    therapyRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.UpdateTherapyQuestionHandler)))).Methods("PUT")
+    therapyRouter.HandleFunc("/questions/{questionID}", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(middleware.AdminMiddleware(handlers.DeleteTherapyQuestionHandler)))).Methods("DELETE")
+
     // Protected routes for progress tracking
     progressRouter := r.PathPrefix("/api/progress").Subrouter()
     progressRouter.HandleFunc("/weekly", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetWeeklyProgressHandler))).Methods("GET")
     progressRouter.HandleFunc("/monthly", middleware.PanicRecoveryMiddleware(middleware.AuthMiddleware(handlers.GetMonthlyProgressHandler))).Methods("GET")
-    
+
     // Start server
     port := os.Getenv("PORT")
     if port == "" {

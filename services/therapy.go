@@ -12,37 +12,6 @@ import (
     "google.golang.org/grpc/status"
 )
 
-// SaveTherapyQuestion saves a new therapy question to Firestore.
-func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, userID string) (string, error) {
-    firestoreClient, err := GetFirestoreClient(ctx)
-    if err != nil {
-        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
-    }
-    defer firestoreClient.Close()
-
-    docRef, _, err := firestoreClient.Collection("therapyQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
-        "type":            question.Type,
-        "category":        question.Category,
-        "content":         question.Content,
-        "description":     question.Description,
-        "imageURL":        question.ImageURL,
-        "soundURL":        question.SoundURL,
-        "options":         question.Options,
-        "leftItems":       question.LeftItems,
-        "rightItems":      question.RightItems,
-        "correctAnswer":   question.CorrectAnswer,
-        "correctSequence": question.CorrectSequence,
-        "correctPairs":    question.CorrectPairs,
-        "timestamp":       firestore.ServerTimestamp,
-    })
-    if err != nil {
-        return "", fmt.Errorf("failed to save therapy question: %w", err)
-    }
-
-    log.Printf("Saved therapy question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
-    return docRef.ID, nil
-}
-
 // GetTherapyQuestions retrieves therapy questions by type and category.
 func GetTherapyQuestions(ctx context.Context, questionType, category string, userID string) ([]models.TherapyQuestion, error) {
     firestoreClient, err := GetFirestoreClient(ctx)
@@ -79,6 +48,18 @@ func GetTherapyQuestions(ctx context.Context, questionType, category string, use
             q.Options = make([]string, len(options))
             for i, opt := range options {
                 q.Options[i] = opt.(string)
+            }
+        }
+        if leftItems, ok := data["leftItems"].([]interface{}); ok {
+            q.LeftItems = make([]string, len(leftItems))
+            for i, item := range leftItems {
+                q.LeftItems[i] = item.(string)
+            }
+        }
+        if rightItems, ok := data["rightItems"].([]interface{}); ok {
+            q.RightItems = make([]string, len(rightItems))
+            for i, item := range rightItems {
+                q.RightItems[i] = item.(string)
             }
         }
         if correctAnswer, ok := data["correctAnswer"].(string); ok {
@@ -139,6 +120,18 @@ func GetTherapyQuestionByID(ctx context.Context, questionType, category, questio
             q.Options[i] = opt.(string)
         }
     }
+    if leftItems, ok := data["leftItems"].([]interface{}); ok {
+        q.LeftItems = make([]string, len(leftItems))
+        for i, item := range leftItems {
+            q.LeftItems[i] = item.(string)
+        }
+    }
+    if rightItems, ok := data["rightItems"].([]interface{}); ok {
+        q.RightItems = make([]string, len(rightItems))
+        for i, item := range rightItems {
+            q.RightItems[i] = item.(string)
+        }
+    }
     if correctAnswer, ok := data["correctAnswer"].(string); ok {
         q.CorrectAnswer = correctAnswer
     }
@@ -191,6 +184,83 @@ func GetTherapyCategories(ctx context.Context, questionType string) ([]models.Th
 
     log.Printf("Retrieved %d categories for type: %s", len(categoryList), questionType)
     return categoryList, nil
+}
+
+// SaveTherapyQuestion saves a new therapy question to Firestore.
+func SaveTherapyQuestion(ctx context.Context, question models.TherapyQuestion, userID string) (string, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    docRef, _, err := firestoreClient.Collection("therapyQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
+        "type":            question.Type,
+        "category":        question.Category,
+        "content":         question.Content,
+        "description":     question.Description,
+        "imageURL":        question.ImageURL,
+        "soundURL":        question.SoundURL,
+        "options":         question.Options,
+        "leftItems":       question.LeftItems,
+        "rightItems":      question.RightItems,
+        "correctAnswer":   question.CorrectAnswer,
+        "correctSequence": question.CorrectSequence,
+        "correctPairs":    question.CorrectPairs,
+        "timestamp":       firestore.ServerTimestamp,
+    })
+    if err != nil {
+        return "", fmt.Errorf("failed to save therapy question: %w", err)
+    }
+
+    log.Printf("Saved therapy question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
+    return docRef.ID, nil
+}
+
+// UpdateTherapyQuestion updates an existing therapy question in Firestore.
+func UpdateTherapyQuestion(ctx context.Context, questionID string, question models.TherapyQuestion, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("therapyQuestions").Doc(question.Type).Collection(question.Category).Doc(questionID).Set(ctx, map[string]interface{}{
+        "type":            question.Type,
+        "category":        question.Category,
+        "content":         question.Content,
+        "description":     question.Description,
+        "imageURL":        question.ImageURL,
+        "soundURL":        question.SoundURL,
+        "options":         question.Options,
+        "correctAnswer":   question.CorrectAnswer,
+        "correctSequence": question.CorrectSequence,
+        "correctPairs":    question.CorrectPairs,
+        "timestamp":       firestore.ServerTimestamp,
+    }, firestore.MergeAll)
+    if err != nil {
+        return fmt.Errorf("failed to update therapy question: %w", err)
+    }
+
+    log.Printf("Updated therapy question with ID: %s, type: %s, category: %s", questionID, question.Type, question.Category)
+    return nil
+}
+
+// DeleteTherapyQuestion deletes a therapy question from Firestore.
+func DeleteTherapyQuestion(ctx context.Context, questionID, questionType, category, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("therapyQuestions").Doc(questionType).Collection(category).Doc(questionID).Delete(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to delete therapy question: %w", err)
+    }
+
+    log.Printf("Deleted therapy question with ID: %s, type: %s, category: %s", questionID, questionType, category)
+    return nil
 }
 
 // SaveTherapyResult saves the user's therapy result with flexible answer validation.

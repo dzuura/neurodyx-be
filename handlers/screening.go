@@ -6,6 +6,7 @@ import (
     "net/http"
     "strconv"
 
+    "github.com/gorilla/mux"
     "github.com/dzuura/neurodyx-be/config"
     "github.com/dzuura/neurodyx-be/middleware"
     "github.com/dzuura/neurodyx-be/models"
@@ -26,6 +27,13 @@ func AddScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
     if question.AgeGroup == "" || question.Question == "" {
         w.WriteHeader(http.StatusBadRequest)
         json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required fields: ageGroup or question"})
+        return
+    }
+
+    validAgeGroups := map[string]bool{"adult": true, "kid": true}
+    if !validAgeGroups[question.AgeGroup] {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid ageGroup. Must be 'adult' or 'kid'"})
         return
     }
 
@@ -78,6 +86,152 @@ func GetScreeningQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     config.StoreInCache(config.ScreeningQuestionCache, ageGroup, questions)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
+}
+
+// GetScreeningQuestionByIDHandler retrieves a screening question by ID.
+func UpdateScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    var question models.ScreeningQuestion
+    if err := json.NewDecoder(r.Body).Decode(&question); err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body: " + err.Error()})
+        return
+    }
+
+    if question.AgeGroup == "" || question.Question == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required fields: ageGroup or question"})
+        return
+    }
+
+    validAgeGroups := map[string]bool{"adult": true, "kid": true}
+    if !validAgeGroups[question.AgeGroup] {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid ageGroup. Must be 'adult' or 'kid'"})
+        return
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var originalAgeGroup string
+    ageGroups := []string{"adult", "kid"}
+    for _, ag := range ageGroups {
+        doc, err := firestoreClient.Collection("screeningQuestions").Doc(ag).Collection("questions").Doc(questionID).Get(r.Context())
+        if err == nil && doc.Exists() {
+            originalAgeGroup = ag
+            break
+        }
+    }
+
+    if originalAgeGroup == "" {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Screening question not found"})
+        return
+    }
+
+    if question.AgeGroup != originalAgeGroup {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Cannot change ageGroup. Update must be within the original ageGroup: " + originalAgeGroup})
+        return
+    }
+
+    err = services.UpdateScreeningQuestion(r.Context(), questionID, question, userID)
+    if err != nil {
+        log.Printf("Error updating screening question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to update screening question: " + err.Error()})
+        return
+    }
+
+    updatedQuestion, err := services.GetScreeningQuestionByID(r.Context(), questionID, question.AgeGroup)
+    if err != nil {
+        log.Printf("Error retrieving updated screening question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve updated question: " + err.Error()})
+        return
+    }
+
+    config.ScreeningQuestionCache.Delete(question.AgeGroup)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(updatedQuestion)
+}
+
+// DeleteScreeningQuestionHandler deletes a screening question by ID.
+func DeleteScreeningQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var ageGroup string
+    ageGroups := []string{"adult", "kid"}
+    for _, ag := range ageGroups {
+        doc, err := firestoreClient.Collection("screeningQuestions").Doc(ag).Collection("questions").Doc(questionID).Get(r.Context())
+        if err == nil && doc.Exists() {
+            ageGroup = ag
+            break
+        }
+    }
+
+    if ageGroup == "" {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Screening question not found"})
+        return
+    }
+
+    err = services.DeleteScreeningQuestion(r.Context(), questionID, ageGroup, userID)
+    if err != nil {
+        log.Printf("Error deleting screening question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to delete screening question: " + err.Error()})
+        return
+    }
+
+    config.ScreeningQuestionCache.Delete(ageGroup)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Screening question deleted successfully"})
 }
 
 // SubmitScreeningHandler processes and saves screening submissions.

@@ -9,27 +9,6 @@ import (
     "github.com/dzuura/neurodyx-be/models"
 )
 
-// SaveScreeningQuestion saves a new screening question to Firestore.
-func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestion, userID string) (string, error) {
-    firestoreClient, err := GetFirestoreClient(ctx)
-    if err != nil {
-        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
-    }
-    defer firestoreClient.Close()
-
-    docRef, _, err := firestoreClient.Collection("screeningQuestions").Doc(question.AgeGroup).Collection("questions").Add(ctx, map[string]interface{}{
-        "ageGroup":  question.AgeGroup,
-        "question":  question.Question,
-        "timestamp": firestore.ServerTimestamp,
-    })
-    if err != nil {
-        return "", fmt.Errorf("failed to save screening question: %w", err)
-    }
-
-    log.Printf("Saved screening question with ID: %s, ageGroup: %s", docRef.ID, question.AgeGroup)
-    return docRef.ID, nil
-}
-
 // GetScreeningQuestions retrieves screening questions, optionally filtered by ageGroup.
 func GetScreeningQuestions(ctx context.Context, ageGroup string, userID string) ([]models.ScreeningQuestion, error) {
     firestoreClient, err := GetFirestoreClient(ctx)
@@ -72,6 +51,90 @@ func GetScreeningQuestions(ctx context.Context, ageGroup string, userID string) 
 
     log.Printf("Retrieved %d screening questions for ageGroup: %s", len(questions), ageGroup)
     return questions, nil
+}
+
+// GetScreeningQuestionByID retrieves a screening question by ID.
+func GetScreeningQuestionByID(ctx context.Context, questionID, ageGroup string) (models.ScreeningQuestion, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return models.ScreeningQuestion{}, fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    doc, err := firestoreClient.Collection("screeningQuestions").Doc(ageGroup).Collection("questions").Doc(questionID).Get(ctx)
+    if err != nil {
+        return models.ScreeningQuestion{}, fmt.Errorf("failed to retrieve screening question: %w", err)
+    }
+
+    var q models.ScreeningQuestion
+    data := doc.Data()
+    q.ID = doc.Ref.ID
+    q.AgeGroup = data["ageGroup"].(string)
+    if question, ok := data["question"].(string); ok {
+        q.Question = question
+    }
+
+    log.Printf("Retrieved screening question with ID: %s, ageGroup: %s", questionID, ageGroup)
+    return q, nil
+}
+
+// SaveScreeningQuestion saves a new screening question to Firestore.
+func SaveScreeningQuestion(ctx context.Context, question models.ScreeningQuestion, userID string) (string, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    docRef, _, err := firestoreClient.Collection("screeningQuestions").Doc(question.AgeGroup).Collection("questions").Add(ctx, map[string]interface{}{
+        "ageGroup":  question.AgeGroup,
+        "question":  question.Question,
+        "timestamp": firestore.ServerTimestamp,
+    })
+    if err != nil {
+        return "", fmt.Errorf("failed to save screening question: %w", err)
+    }
+
+    log.Printf("Saved screening question with ID: %s, ageGroup: %s", docRef.ID, question.AgeGroup)
+    return docRef.ID, nil
+}
+
+// UpdateScreeningQuestion updates an existing screening question in Firestore.
+func UpdateScreeningQuestion(ctx context.Context, questionID string, question models.ScreeningQuestion, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("screeningQuestions").Doc(question.AgeGroup).Collection("questions").Doc(questionID).Set(ctx, map[string]interface{}{
+        "ageGroup":  question.AgeGroup,
+        "question":  question.Question,
+        "timestamp": firestore.ServerTimestamp,
+    }, firestore.MergeAll)
+    if err != nil {
+        return fmt.Errorf("failed to update screening question: %w", err)
+    }
+
+    log.Printf("Updated screening question with ID: %s, ageGroup: %s", questionID, question.AgeGroup)
+    return nil
+}
+
+// DeleteScreeningQuestion deletes a screening question from Firestore.
+func DeleteScreeningQuestion(ctx context.Context, questionID, ageGroup, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("screeningQuestions").Doc(ageGroup).Collection("questions").Doc(questionID).Delete(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to delete screening question: %w", err)
+    }
+
+    log.Printf("Deleted screening question with ID: %s, ageGroup: %s", questionID, ageGroup)
+    return nil
 }
 
 // SaveScreeningResult saves the user's screening submission and risk level.

@@ -11,89 +11,6 @@ import (
     "google.golang.org/grpc/status"
 )
 
-// GetQuestionByID retrieves a question by its ID, type, and category.
-func GetQuestionByID(ctx context.Context, questionType, category, questionID string) (models.AssessmentQuestion, error) {
-    firestoreClient, err := GetFirestoreClient(ctx)
-    if err != nil {
-        return models.AssessmentQuestion{}, fmt.Errorf("failed to connect to Firestore: %w", err)
-    }
-    defer firestoreClient.Close()
-
-    doc, err := firestoreClient.Collection("assessmentQuestions").Doc(questionType).Collection(category).Doc(questionID).Get(ctx)
-    if err != nil {
-        return models.AssessmentQuestion{}, fmt.Errorf("failed to retrieve question: %w", err)
-    }
-
-    var q models.AssessmentQuestion
-    data := doc.Data()
-    q.ID = doc.Ref.ID
-    q.Type = data["type"].(string)
-    q.Category = data["category"].(string)
-    if content, ok := data["content"].(string); ok {
-        q.Content = content
-    }
-    if imageURL, ok := data["imageURL"].(string); ok {
-        q.ImageURL = imageURL
-    }
-    if soundURL, ok := data["soundURL"].(string); ok {
-        q.SoundURL = soundURL
-    }
-    if options, ok := data["options"].([]interface{}); ok {
-        q.Options = make([]string, len(options))
-        for i, opt := range options {
-            q.Options[i] = opt.(string)
-        }
-    }
-    if correctAnswer, ok := data["correctAnswer"].(string); ok {
-        q.CorrectAnswer = correctAnswer
-    }
-    if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
-        q.CorrectSequence = make([]string, len(correctSeq))
-        for i, seq := range correctSeq {
-            q.CorrectSequence[i] = seq.(string)
-        }
-    }
-    if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
-        q.CorrectPairs = make(map[string]string)
-        for k, v := range correctPairs {
-            q.CorrectPairs[k] = v.(string)
-        }
-    }
-
-    log.Printf("Retrieved question with ID: %s, type: %s, category: %s", questionID, questionType, category)
-    return q, nil
-}
-
-// SaveAssessmentQuestion saves a new assessment question to Firestore.
-func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuestion, userID string) (string, error) {
-    firestoreClient, err := GetFirestoreClient(ctx)
-    if err != nil {
-        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
-    }
-    defer firestoreClient.Close()
-
-    docRef, _, err := firestoreClient.Collection("assessmentQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
-        "type":            question.Type,
-        "category":        question.Category,
-        "content":         question.Content,
-        "imageURL":        question.ImageURL,
-        "soundURL":        question.SoundURL,
-        "options":         question.Options,
-        "leftItems":       question.LeftItems,
-        "rightItems":      question.RightItems,
-        "correctAnswer":   question.CorrectAnswer,
-        "correctSequence": question.CorrectSequence,
-        "correctPairs":    question.CorrectPairs,
-        "timestamp":       firestore.ServerTimestamp,
-    })
-    if err != nil {
-        return "", fmt.Errorf("failed to save assessment question: %w", err)
-    }
-
-    log.Printf("Saved assessment question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
-    return docRef.ID, nil
-}
-
 // GetAssessmentQuestions retrieves assessment questions by type.
 func GetAssessmentQuestions(ctx context.Context, questionType string, userID string) ([]models.AssessmentQuestion, error) {
     firestoreClient, err := GetFirestoreClient(ctx)
@@ -172,6 +89,148 @@ func GetAssessmentQuestions(ctx context.Context, questionType string, userID str
 
     log.Printf("Retrieved %d assessment questions for type: %s", len(questions), questionType)
     return questions, nil
+}
+
+// GetAssessmentQuestionByID retrieves an assessment question by its ID, type, and category.
+func GetAssessmentQuestionByID(ctx context.Context, questionType, category, questionID string) (models.AssessmentQuestion, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return models.AssessmentQuestion{}, fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    doc, err := firestoreClient.Collection("assessmentQuestions").Doc(questionType).Collection(category).Doc(questionID).Get(ctx)
+    if err != nil {
+        return models.AssessmentQuestion{}, fmt.Errorf("failed to retrieve question: %w", err)
+    }
+
+    var q models.AssessmentQuestion
+    data := doc.Data()
+    q.ID = doc.Ref.ID
+    q.Type = data["type"].(string)
+    q.Category = data["category"].(string)
+    if content, ok := data["content"].(string); ok {
+        q.Content = content
+    }
+    if imageURL, ok := data["imageURL"].(string); ok {
+        q.ImageURL = imageURL
+    }
+    if soundURL, ok := data["soundURL"].(string); ok {
+        q.SoundURL = soundURL
+    }
+    if options, ok := data["options"].([]interface{}); ok {
+        q.Options = make([]string, len(options))
+        for i, opt := range options {
+            q.Options[i] = opt.(string)
+        }
+    }
+    if leftItems, ok := data["leftItems"].([]interface{}); ok {
+        q.LeftItems = make([]string, len(leftItems))
+        for i, item := range leftItems {
+            q.LeftItems[i] = item.(string)
+        }
+    }
+    if rightItems, ok := data["rightItems"].([]interface{}); ok {
+        q.RightItems = make([]string, len(rightItems))
+        for i, item := range rightItems {
+            q.RightItems[i] = item.(string)
+        }
+    }
+    if correctAnswer, ok := data["correctAnswer"].(string); ok {
+        q.CorrectAnswer = correctAnswer
+    }
+    if correctSeq, ok := data["correctSequence"].([]interface{}); ok {
+        q.CorrectSequence = make([]string, len(correctSeq))
+        for i, seq := range correctSeq {
+            q.CorrectSequence[i] = seq.(string)
+        }
+    }
+    if correctPairs, ok := data["correctPairs"].(map[string]interface{}); ok {
+        q.CorrectPairs = make(map[string]string)
+        for k, v := range correctPairs {
+            q.CorrectPairs[k] = v.(string)
+        }
+    }
+
+    log.Printf("Retrieved assessment question with ID: %s, type: %s, category: %s", questionID, questionType, category)
+    return q, nil
+}
+
+// SaveAssessmentQuestion saves a new assessment question to Firestore.
+func SaveAssessmentQuestion(ctx context.Context, question models.AssessmentQuestion, userID string) (string, error) {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    docRef, _, err := firestoreClient.Collection("assessmentQuestions").Doc(question.Type).Collection(question.Category).Add(ctx, map[string]interface{}{
+        "type":            question.Type,
+        "category":        question.Category,
+        "content":         question.Content,
+        "imageURL":        question.ImageURL,
+        "soundURL":        question.SoundURL,
+        "options":         question.Options,
+        "leftItems":       question.LeftItems,
+        "rightItems":      question.RightItems,
+        "correctAnswer":   question.CorrectAnswer,
+        "correctSequence": question.CorrectSequence,
+        "correctPairs":    question.CorrectPairs,
+        "timestamp":       firestore.ServerTimestamp,
+    })
+    if err != nil {
+        return "", fmt.Errorf("failed to save assessment question: %w", err)
+    }
+
+    log.Printf("Saved assessment question with ID: %s, type: %s, category: %s", docRef.ID, question.Type, question.Category)
+    return docRef.ID, nil
+}
+
+// UpdateAssessmentQuestion updates an existing assessment question in Firestore.
+func UpdateAssessmentQuestion(ctx context.Context, questionID string, question models.AssessmentQuestion, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("assessmentQuestions").Doc(question.Type).Collection(question.Category).Doc(questionID).Set(ctx, map[string]interface{}{
+        "type":            question.Type,
+        "category":        question.Category,
+        "content":         question.Content,
+        "imageURL":        question.ImageURL,
+        "soundURL":        question.SoundURL,
+        "options":         question.Options,
+        "leftItems":       question.LeftItems,
+        "rightItems":      question.RightItems,
+        "correctAnswer":   question.CorrectAnswer,
+        "correctSequence": question.CorrectSequence,
+        "correctPairs":    question.CorrectPairs,
+        "timestamp":       firestore.ServerTimestamp,
+    }, firestore.MergeAll)
+    if err != nil {
+        return fmt.Errorf("failed to update assessment question: %w", err)
+    }
+
+    log.Printf("Updated assessment question with ID: %s, type: %s, category: %s", questionID, question.Type, question.Category)
+    return nil
+}
+
+// DeleteAssessmentQuestion deletes an assessment question from Firestore.
+func DeleteAssessmentQuestion(ctx context.Context, questionID, questionType, category, userID string) error {
+    firestoreClient, err := GetFirestoreClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to connect to Firestore: %w", err)
+    }
+    defer firestoreClient.Close()
+
+    _, err = firestoreClient.Collection("assessmentQuestions").Doc(questionType).Collection(category).Doc(questionID).Delete(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to delete assessment question: %w", err)
+    }
+
+    log.Printf("Deleted assessment question with ID: %s, type: %s, category: %s", questionID, questionType, category)
+    return nil
 }
 
 // SaveAssessmentResult saves the user's assessment result with flexible answer validation.

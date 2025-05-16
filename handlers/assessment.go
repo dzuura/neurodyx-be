@@ -1,15 +1,16 @@
 package handlers
 
 import (
-    "encoding/json"
-    "log"
-    "net/http"
-    "strings"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strings"
 
-    "github.com/dzuura/neurodyx-be/config"
-    "github.com/dzuura/neurodyx-be/middleware"
-    "github.com/dzuura/neurodyx-be/models"
-    "github.com/dzuura/neurodyx-be/services"
+    "github.com/gorilla/mux"
+	"github.com/dzuura/neurodyx-be/config"
+	"github.com/dzuura/neurodyx-be/middleware"
+	"github.com/dzuura/neurodyx-be/models"
+	"github.com/dzuura/neurodyx-be/services"
 )
 
 // AddAssessmentQuestionHandler creates a new assessment question.
@@ -92,6 +93,179 @@ func GetAssessmentQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
+}
+
+// GetAssessmentQuestionByIDHandler retrieves a specific assessment question by ID.
+func UpdateAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    var question models.AssessmentQuestion
+    if err := json.NewDecoder(r.Body).Decode(&question); err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body: " + err.Error()})
+        return
+    }
+
+    requiredFields := map[string]string{
+        "type":    question.Type,
+        "category": question.Category,
+    }
+    for field, value := range requiredFields {
+        if value == "" {
+            w.WriteHeader(http.StatusBadRequest)
+            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: " + field})
+            return
+        }
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var originalType, originalCategory string
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    found := false
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("assessmentQuestions").Doc(t).Collections(r.Context())
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            log.Printf("Failed to retrieve categories for type %s: %v", t, err)
+            continue
+        }
+        for _, category := range categories {
+            doc, err := category.Doc(questionID).Get(r.Context())
+            if err == nil && doc.Exists() {
+                originalType = t
+                originalCategory = category.ID
+                found = true
+                break
+            }
+        }
+        if found {
+            break
+        }
+    }
+
+    if !found {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Assessment question not found"})
+        return
+    }
+
+    if question.Type != originalType || question.Category != originalCategory {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Cannot change type or category. Update must be within the original type: " + originalType + " and category: " + originalCategory})
+        return
+    }
+
+    err = services.UpdateAssessmentQuestion(r.Context(), questionID, question, userID)
+    if err != nil {
+        log.Printf("Error updating assessment question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to update assessment question: " + err.Error()})
+        return
+    }
+
+    updatedQuestion, err := services.GetAssessmentQuestionByID(r.Context(), question.Type, question.Category, questionID)
+    if err != nil {
+        log.Printf("Error retrieving updated assessment question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve updated question: " + err.Error()})
+        return
+    }
+
+    config.AssessmentQuestionCache.Delete(question.Type)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(updatedQuestion)
+}
+
+// DeleteAssessmentQuestionHandler deletes an assessment question by ID.
+func DeleteAssessmentQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var questionType, category string
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    found := false
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("assessmentQuestions").Doc(t).Collections(r.Context())
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            log.Printf("Failed to retrieve categories for type %s: %v", t, err)
+            continue
+        }
+        for _, cat := range categories {
+            doc, err := cat.Doc(questionID).Get(r.Context())
+            if err == nil && doc.Exists() {
+                questionType = t
+                category = cat.ID
+                found = true
+                break
+            }
+        }
+        if found {
+            break
+        }
+    }
+
+    if !found {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Assessment question not found"})
+        return
+    }
+
+    err = services.DeleteAssessmentQuestion(r.Context(), questionID, questionType, category, userID)
+    if err != nil {
+        log.Printf("Error deleting assessment question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to delete assessment question: " + err.Error()})
+        return
+    }
+
+    config.AssessmentQuestionCache.Delete(questionType)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Assessment question deleted successfully"})
 }
 
 // SubmitAnswerHandler processes and saves assessment answer submissions.

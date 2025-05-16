@@ -5,6 +5,7 @@ import (
     "log"
     "net/http"
 
+    "github.com/gorilla/mux"
     "github.com/dzuura/neurodyx-be/config"
     "github.com/dzuura/neurodyx-be/middleware"
     "github.com/dzuura/neurodyx-be/models"
@@ -113,6 +114,181 @@ func GetTherapyQuestionsHandler(w http.ResponseWriter, r *http.Request) {
     config.StoreInCache(config.TherapyQuestionCache, cacheKey, questions)
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(questions)
+}
+
+// GetTherapyQuestionByIDHandler retrieves a therapy question by ID.
+func UpdateTherapyQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    var question models.TherapyQuestion
+    if err := json.NewDecoder(r.Body).Decode(&question); err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Invalid request body: " + err.Error()})
+        return
+    }
+
+    requiredFields := map[string]string{
+        "type":    question.Type,
+        "category": question.Category,
+    }
+    for field, value := range requiredFields {
+        if value == "" {
+            w.WriteHeader(http.StatusBadRequest)
+            json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required field: " + field})
+            return
+        }
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var originalType, originalCategory string
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    found := false
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("therapyQuestions").Doc(t).Collections(r.Context())
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            log.Printf("Failed to retrieve categories for type %s: %v", t, err)
+            continue
+        }
+        for _, category := range categories {
+            doc, err := category.Doc(questionID).Get(r.Context())
+            if err == nil && doc.Exists() {
+                originalType = t
+                originalCategory = category.ID
+                found = true
+                break
+            }
+        }
+        if found {
+            break
+        }
+    }
+
+    if !found {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Therapy question not found"})
+        return
+    }
+
+    if question.Type != originalType || question.Category != originalCategory {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Cannot change type or category. Update must be within the original type: " + originalType + " and category: " + originalCategory})
+        return
+    }
+
+    err = services.UpdateTherapyQuestion(r.Context(), questionID, question, userID)
+    if err != nil {
+        log.Printf("Error updating therapy question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to update therapy question: " + err.Error()})
+        return
+    }
+
+    updatedQuestion, err := services.GetTherapyQuestionByID(r.Context(), question.Type, question.Category, questionID)
+    if err != nil {
+        log.Printf("Error retrieving updated therapy question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to retrieve updated question: " + err.Error()})
+        return
+    }
+
+    cacheKey := question.Type + ":" + question.Category
+    config.TherapyQuestionCache.Delete(cacheKey)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(updatedQuestion)
+}
+
+// DeleteTherapyQuestionHandler deletes a therapy question by ID.
+func DeleteTherapyQuestionHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+    if !ok {
+        w.WriteHeader(http.StatusUnauthorized)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "User ID missing"})
+        return
+    }
+
+    questionID := mux.Vars(r)["questionID"]
+    if questionID == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Missing required parameter: questionID"})
+        return
+    }
+
+    firestoreClient, err := config.App.Firestore(r.Context())
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to connect to Firestore"})
+        return
+    }
+    defer firestoreClient.Close()
+
+    var questionType, category string
+    types := []string{"visual", "auditory", "kinesthetic", "tactile"}
+    found := false
+    for _, t := range types {
+        categoriesIter := firestoreClient.Collection("therapyQuestions").Doc(t).Collections(r.Context())
+        categories, err := categoriesIter.GetAll()
+        if err != nil {
+            log.Printf("Failed to retrieve categories for type %s: %v", t, err)
+            continue
+        }
+        for _, cat := range categories {
+            doc, err := cat.Doc(questionID).Get(r.Context())
+            if err == nil && doc.Exists() {
+                questionType = t
+                category = cat.ID
+                found = true
+                break
+            }
+        }
+        if found {
+            break
+        }
+    }
+
+    if !found {
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Therapy question not found"})
+        return
+    }
+
+    err = services.DeleteTherapyQuestion(r.Context(), questionID, questionType, category, userID)
+    if err != nil {
+        log.Printf("Error deleting therapy question %s: %v", questionID, err)
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(models.ErrorResponse{Error: "Failed to delete therapy question: " + err.Error()})
+        return
+    }
+
+    cacheKey := questionType + ":" + category
+    config.TherapyQuestionCache.Delete(cacheKey)
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Therapy question deleted successfully"})
 }
 
 // SubmitTherapyAnswerHandler processes and saves therapy answer submissions.
