@@ -3,7 +3,6 @@ package middleware
 import (
     "net/http"
     "sync"
-    "time"
     "encoding/json"
 
     "github.com/dzuura/neurodyx-be/models"
@@ -21,7 +20,7 @@ func (ls *LimiterStore) GetLimiter(key string) *rate.Limiter {
     ls.mu.Lock()
     defer ls.mu.Unlock()
     if _, exists := ls.limiters[key]; !exists {
-        ls.limiters[key] = rate.NewLimiter(rate.Every(time.Minute), 10)
+        ls.limiters[key] = rate.NewLimiter(rate.Limit(25)/60, 25)
     }
     return ls.limiters[key]
 }
